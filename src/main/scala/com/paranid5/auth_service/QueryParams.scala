@@ -1,4 +1,4 @@
-package com.paranid5.authback
+package com.paranid5.auth_service
 
 import org.http4s.dsl.io.*
 

@@ -1,5 +1,4 @@
-package com.paranid5.authback
-package token
+package com.paranid5.auth_service.token
 
 import cats.effect.IO
 import cats.effect.std.SecureRandom
