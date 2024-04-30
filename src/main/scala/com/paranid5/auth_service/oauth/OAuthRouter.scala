@@ -1,6 +1,5 @@
 package com.paranid5.auth_service.oauth
 
-import com.paranid5.auth_service.entity.User
 import cats.effect.IO
 import org.http4s.{AuthedRoutes, HttpRoutes}
 import org.http4s.dsl.io.*

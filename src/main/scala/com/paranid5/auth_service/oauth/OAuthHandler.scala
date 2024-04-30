@@ -1,7 +1,6 @@
 package com.paranid5.auth_service.oauth
 
-import com.paranid5.auth_service.entity.User
-
+import com.paranid5.auth_service.data.user.entity.User
 import scalaoauth2.provider.{AccessToken, AuthInfo, AuthorizationRequest, ClientCredential, DataHandler}
 
 import scala.concurrent.Future
