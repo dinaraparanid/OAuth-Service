@@ -12,23 +12,19 @@ private val TokenCharsLen: Int    = TokenChars.length
 private val GeneratorAlgo: String = "SHA-256"
 
 def generateToken(tokenPrefix: String): IO[Either[Throwable, String]] =
-  for
-    token  ← generateTokenImpl
-    result ← encodeToSha(f"$tokenPrefix${System.currentTimeMillis}$token")
-  yield result
+  for token ← generateTokenImpl
+    yield encodeToSha(f"$tokenPrefix${System.currentTimeMillis}$token")
 
 extension (bytes: Array[Byte])
   private def toHex: String =
-    bytes map ("%02x".format(_)) mkString ""
+    bytes map ("%02x" format _) mkString ""
 
-private def encodeToSha(s: String): IO[Either[Throwable, String]] =
-  def impl: String =
+private def encodeToSha(s: String): Either[Throwable, String] =
+  Right:
     MessageDigest
       .getInstance(GeneratorAlgo)
-      .digest(s.getBytes("UTF-8"))
+      .digest(s `getBytes` "UTF-8")
       .toHex
-
-  IO(impl).attempt
 
 private def generateTokenImpl: IO[String] =
   @tailrec
@@ -37,14 +33,13 @@ private def generateTokenImpl: IO[String] =
     res:      IO[String] = IO pure "",
     iterLeft: Int        = TokenCharsLen
   ): IO[String] =
-    if iterLeft == 0 then
-      return res
-
-    impl(
-      random   = random,
-      res      = nextTokenChar(random) map (c ⇒ f"$res$c"),
-      iterLeft = iterLeft - 1
-    )
+    iterLeft match
+      case 0 ⇒ res
+      case _ ⇒ impl(
+        random   = random,
+        res      = nextTokenChar(random) map (c ⇒ f"$res$c"),
+        iterLeft = iterLeft - 1
+      )
 
   def nextTokenChar(random: SecureRandom[IO]): IO[Char] =
     for charIdx ← random.betweenInt(minInclusive = 0, maxExclusive = TokenCharsLen)

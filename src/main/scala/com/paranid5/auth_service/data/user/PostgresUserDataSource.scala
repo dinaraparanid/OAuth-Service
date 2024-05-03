@@ -1,6 +1,7 @@
 package com.paranid5.auth_service.data.user
 
 import com.paranid5.auth_service.data.user.entity.User
+
 import doobie.free.connection.ConnectionIO
 import doobie.implicits.toSqlInterpolator
 
@@ -10,9 +11,7 @@ object PostgresUserDataSource:
   given UserDataSource[ConnectionIO, PostgresUserDataSource] with
     extension (source: PostgresUserDataSource)
       override def users: ConnectionIO[List[User]] =
-        sql"""SELECT * FROM "User""""
-          .query[User]
-          .to[List]
+        sql"""SELECT * FROM "User"""".query[User].to[List]
 
       override def storeUser(
         userId:          Long,

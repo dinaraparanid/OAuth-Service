@@ -1,8 +1,11 @@
 package com.paranid5.auth_service.data.oauth
 
-import cats.Applicative
-import com.paranid5.auth_service.data.oauth.token.AccessTokenCreationFailure
+import com.paranid5.auth_service.data.oauth.token.InvalidTokenReason
 import com.paranid5.auth_service.data.oauth.token.entity.{AccessToken, RefreshToken}
+
+
+import cats.Applicative
+
 import io.github.cdimascio.dotenv.Dotenv
 
 trait OAuthRepository[F[_] : Applicative, R]:
@@ -37,7 +40,7 @@ trait OAuthRepository[F[_] : Applicative, R]:
 
     def userAccessTokens(userId: Long): F[List[AccessToken]]
 
-    def newAccessToken(refreshToken: RefreshToken): F[Either[AccessTokenCreationFailure, AccessToken]]
+    def newAccessToken(refreshToken: RefreshToken): F[Either[InvalidTokenReason, AccessToken]]
 
     def newRefreshToken(clientId: Long, clientSecret: String): F[Option[RefreshToken]]
 
