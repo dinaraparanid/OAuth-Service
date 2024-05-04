@@ -8,10 +8,10 @@ trait ClientDataSource[F[_] : Applicative, S]:
   extension (source: S)
     def clients: F[List[ClientEntity]]
 
-    def isClientExits(
+    def getClient(
       clientId:     Long,
       clientSecret: String
-    ): F[Boolean]
+    ): F[Option[ClientEntity]]
 
     def storeClient(
       clientId:     Long,

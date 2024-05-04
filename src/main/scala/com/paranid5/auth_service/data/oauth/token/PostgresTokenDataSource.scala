@@ -1,40 +1,58 @@
 package com.paranid5.auth_service.data.oauth.token
 
 import com.paranid5.auth_service.data.oauth.token.entity.{RefreshToken, TokenEntity, TokenStatus, isActual}
-
+import com.paranid5.auth_service.data.oauth.token.error.InvalidTokenReason
+import com.paranid5.auth_service.data.ops.*
 import cats.syntax.all.*
-
 import doobie.free.connection.ConnectionIO
 import doobie.implicits.toSqlInterpolator
-
-private val RefreshTokenAliveTime = 2_592_000_000L // 30 days
+import doobie.util.fragment.Fragment
 
 final class PostgresTokenDataSource
 
 object PostgresTokenDataSource:
+  private val RefreshTokenAliveTime = 2_592_000_000L // 30 days
+
   given TokenDataSource[ConnectionIO, PostgresTokenDataSource] with
+    override type TokenAttemptF[T] = ConnectionIO[Either[InvalidTokenReason, T]]
+
     extension (source: PostgresTokenDataSource)
-      override def userAccessTokens(userId: Long): ConnectionIO[List[TokenEntity]] =
+      override def getClientAccessTokens(clientId: Long): ConnectionIO[List[TokenEntity]] =
         sql"""
         SELECT * FROM "Token"
-        WHERE user_id = $userId AND status = "access"
-        """.query[TokenEntity].to[List]
+        WHERE client_id = $clientId AND status = "access"
+        """.list[TokenEntity]
+
+      override def getClientRefreshToken(clientId: Long): ConnectionIO[Option[RefreshToken]] =
+        sql"""
+        SELECT * FROM "Token"
+        WHERE client_id = $clientId AND status = "refresh"
+        """.option[RefreshToken]
+
+      override def getToken(
+        clientId:     Long,
+        tokenValue:   String
+      ): ConnectionIO[Option[TokenEntity]] =
+        sql"""
+        SELECT * FROM "Token"
+        WHERE client_id = $clientId AND value = $tokenValue
+        """.option[TokenEntity]
 
       override def newAccessToken(
         refreshToken: RefreshToken,
         title:        String,
         lifeSeconds:  Option[Long],
         tokenValue:   String,
-      ): ConnectionIO[Either[InvalidTokenReason, TokenEntity]] =
-        def impl(tokenValue: String): ConnectionIO[Either[InvalidTokenReason, TokenEntity]] =
+      ): TokenAttemptF[TokenEntity] =
+        def impl(tokenValue: String): TokenAttemptF[TokenEntity] =
           newToken(
-            userId      = refreshToken.userId,
+            clientId    = refreshToken.clientId,
             title       = Option(title),
             value       = tokenValue,
             lifeSeconds = lifeSeconds,
             createdAt   = System.currentTimeMillis,
             status      = TokenStatus.Access.title
-          ).map(_ toRight InvalidTokenReason.GenerationError)
+          )
 
         for
           _     ← isTokenValid(refreshToken)
@@ -45,20 +63,19 @@ object PostgresTokenDataSource:
         clientId:     Long,
         clientSecret: String,
         tokenValue:   String,
-      ): ConnectionIO[Either[InvalidTokenReason, RefreshToken]] =
+      ): TokenAttemptF[RefreshToken] =
         newToken(
-          userId      = clientId,
+          clientId    = clientId,
           title       = None,
           value       = tokenValue,
           lifeSeconds = Option(RefreshTokenAliveTime),
           createdAt   = System.currentTimeMillis,
           status      = TokenStatus.Refresh.title
-        ).map(_ toRight InvalidTokenReason.GenerationError)
+        )
 
-
-      override def isTokenValid(token: TokenEntity): ConnectionIO[Either[InvalidTokenReason, Unit]] =
-        val TokenEntity(userId, title, value, lifeSeconds, createdAt, status) = token
-        for foundTokenOpt ← getToken(userId = userId, title = title, value = value)
+      override def isTokenValid(token: TokenEntity): TokenAttemptF[Unit] =
+        val TokenEntity(clientId, title, value, lifeSeconds, createdAt, status) = token
+        for foundTokenOpt ← getToken(clientId = clientId, title = title, value = value)
           yield foundTokenOpt
             .toRight(InvalidTokenReason.NotFound)
             .flatMap: token ⇒
@@ -66,30 +83,52 @@ object PostgresTokenDataSource:
               else Left(InvalidTokenReason.Expired)
 
       override def getToken(
-        userId: Long,
-        title:  Option[String],
-        value:  String
+        clientId: Long,
+        title:    Option[String],
+        value:    String
       ): ConnectionIO[Option[TokenEntity]] =
         sql"""
         SELECT * FROM "Token"
-        WHERE user_id = $userId AND title = $title AND value = $value
-        """
-          .query[TokenEntity]
-          .to[List]
-          .map(_.headOption)
+        WHERE client_id = $clientId AND title = $title AND value = $value
+        """.option[TokenEntity]
+
+      override def removeToken(
+        clientId: Long,
+        title:    Option[String]
+      ): TokenAttemptF[Unit] =
+        sql"""
+        DELETE FROM "Token"
+        WHERE client_id = $clientId AND title = $title
+        """.attemptDelete
 
       private def newToken(
-        userId:      Long,
+        clientId:    Long,
         title:       Option[String],
         value:       String,
         lifeSeconds: Option[Long],
         createdAt:   Long,
         status:      String
-      ): ConnectionIO[Option[TokenEntity]] =
+      ): TokenAttemptF[TokenEntity] =
         sql"""
-        INSERT INTO "Token" (user_id, title, value, life_seconds, created_at, status)
-        VALUES ($userId, $title, $value, $lifeSeconds, $createdAt, $status)
-        """.update.run.attempt.map: res ⇒
-          res
-            .map(_ ⇒ TokenEntity(userId, title, value, lifeSeconds, createdAt, status))
-            .toOption
+        INSERT INTO "Token" (client_id, title, value, life_seconds, created_at, status)
+        VALUES ($clientId, $title, $value, $lifeSeconds, $createdAt, $status)
+        """.attemptInsert:
+          TokenEntity(clientId, title, value, lifeSeconds, createdAt, status)
+
+  extension (query: Fragment)
+    private def attemptInsert(
+      token: TokenEntity
+    ): ConnectionIO[Either[InvalidTokenReason, TokenEntity]] =
+      query.update.run.attempt.map: res ⇒
+        res.bimap(
+          fa = _ ⇒ InvalidTokenReason.GenerationError,
+          fb = _ ⇒ token,
+        )
+
+    private def attemptDelete: ConnectionIO[Either[InvalidTokenReason, Unit]] =
+      query.update.run.attempt.map: res ⇒
+        res.bimap(
+          fa = _ ⇒ InvalidTokenReason.NotFound,
+          fb = _ ⇒ ()
+        )
+

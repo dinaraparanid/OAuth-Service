@@ -3,7 +3,7 @@ package com.paranid5.auth_service.data.oauth.token.entity
 private val MillisInSecond = 1000
 
 case class TokenEntity(
-  userId:      Long,
+  clientId:    Long,
   title:       Option[String],
   value:       String,
   lifeSeconds: Option[Long],

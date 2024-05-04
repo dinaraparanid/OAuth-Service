@@ -1,29 +1,27 @@
 package com.paranid5.auth_service.data.oauth
 
-import com.paranid5.auth_service.data.oauth.token.InvalidTokenReason
-import com.paranid5.auth_service.data.oauth.token.entity.{AccessToken, RefreshToken}
-
+import com.paranid5.auth_service.data.oauth.token.entity.{AccessToken, RefreshToken, TokenScope}
+import com.paranid5.auth_service.data.oauth.token.error.InvalidTokenReason
 
 import cats.Applicative
 
 import io.github.cdimascio.dotenv.Dotenv
 
 trait OAuthRepository[F[_] : Applicative, R]:
+  type TokenAttemptF[T] = F[Either[InvalidTokenReason, T]]
+
   def connect(dotenv: Dotenv): R
 
   extension (repository: R)
-    def getClientWithTokens(clientId: Long): F[Client]
+    def getClientWithTokens(
+      clientId:     Long,
+      clientSecret: String
+    ): F[Option[Client]]
 
-    def isAccessTokenValid(
+    def isTokenValid(
       clientId:     Long,
       clientSecret: String,
-      accessToken:  String
-    ): F[Boolean]
-
-    def isRefreshTokenValid(
-      clientId:     Long,
-      clientSecret: String,
-      refreshToken: String
+      tokenValue:   String
     ): F[Boolean]
 
     def isClientExits(
@@ -38,11 +36,16 @@ trait OAuthRepository[F[_] : Applicative, R]:
 
     def deleteClient(clientId: Long): F[Unit]
 
-    def userAccessTokens(userId: Long): F[List[AccessToken]]
+    def getClientAccessTokens(clientId: Long): F[List[AccessToken]]
 
-    def newAccessToken(refreshToken: RefreshToken): F[Either[InvalidTokenReason, AccessToken]]
+    def newAccessToken(
+      refreshToken:     RefreshToken,
+      accessTokenTitle: String,
+      lifeSeconds:      Option[Long],
+      scopes:           List[TokenScope]
+    ): TokenAttemptF[AccessToken]
 
-    def newRefreshToken(clientId: Long, clientSecret: String): F[Option[RefreshToken]]
-
-
-
+    def newRefreshToken(
+      clientId:     Long,
+      clientSecret: String
+    ): TokenAttemptF[RefreshToken]

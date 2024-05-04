@@ -1,7 +1,10 @@
 package com.paranid5.auth_service.data.oauth.client
 
-import cats.effect.IO
 import com.paranid5.auth_service.data.oauth.client.entity.ClientEntity
+import com.paranid5.auth_service.data.ops.*
+
+import cats.effect.IO
+
 import doobie.free.connection.ConnectionIO
 import doobie.implicits.toSqlInterpolator
 
@@ -11,19 +14,17 @@ object PostgresClientDataSource:
   given ClientDataSource[ConnectionIO, PostgresClientDataSource] with
     extension (source: PostgresClientDataSource)
       override def clients: ConnectionIO[List[ClientEntity]] =
-        sql"""SELECT * FROM "Client"""".query[ClientEntity].to[List]
+        sql"""SELECT * FROM "Client"""".list[ClientEntity]
 
-      override def isClientExits(
+      override def getClient(
         clientId:     Long,
         clientSecret: String
-      ): ConnectionIO[Boolean] =
+      ): ConnectionIO[Option[ClientEntity]] =
         sql"""
-        SELECT EXISTS(
-          SELECT 1
-          FROM  "Client"
-          WHERE client_id = $clientId AND client_secret = $clientSecret
-        )
-        """.query[Boolean].unique
+        SELECT *
+        FROM  "Client"
+        WHERE client_id = $clientId AND client_secret = $clientSecret
+        """.option[ClientEntity]
 
       override def storeClient(
         clientId:     Long,
@@ -32,8 +33,8 @@ object PostgresClientDataSource:
         sql"""
         INSERT INTO "Client" (client_id, client_secret)
         VALUES ($clientId, $clientSecret)
-        """.update.run.map(_ ⇒ ())
+        """.effect
 
       override def deleteClient(clientId: Long): ConnectionIO[Unit] =
-        sql"""DELETE FROM  "Client" WHERE client_id = $clientId""".update.run.map(_ ⇒ ())
+        sql"""DELETE FROM  "Client" WHERE client_id = $clientId""".effect
 
