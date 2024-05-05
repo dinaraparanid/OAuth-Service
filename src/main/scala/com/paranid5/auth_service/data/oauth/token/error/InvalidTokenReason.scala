@@ -1,4 +1,4 @@
 package com.paranid5.auth_service.data.oauth.token.error
 
-enum InvalidTokenReason:
+enum InvalidTokenReason extends InvalidOAuthReason:
   case Expired, NotFound, GenerationError

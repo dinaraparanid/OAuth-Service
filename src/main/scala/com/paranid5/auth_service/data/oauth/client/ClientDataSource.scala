@@ -13,22 +13,22 @@ trait ClientDataSource[F[_] : Applicative, S]:
       clientSecret: String
     ): F[Option[ClientEntity]]
 
-    def storeClient(
+    def insertClient(
       clientId:     Long,
       clientSecret: String
     ): F[Unit]
 
-    infix def storeClient(client: ClientEntity): F[Unit] =
-      source.storeClient(
+    infix def insertClient(client: ClientEntity): F[Unit] =
+      source.insertClient(
         clientId     = client.clientId,
         clientSecret = client.clientSecret
       )
 
-    infix def storeClients(clients: List[ClientEntity]): F[Unit] =
+    infix def insertClients(clients: List[ClientEntity]): F[Unit] =
       clients
-        .map(source storeClient _)
+        .map(source insertClient _)
         .sequence
         .map(_ ⇒ ())
 
-    def deleteClient(clientId: Long): F[Unit]
+    infix def deleteClient(clientId: Long): F[Unit]
 

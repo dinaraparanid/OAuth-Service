@@ -1,16 +1,21 @@
 package com.paranid5.auth_service.data.oauth
 
 import com.paranid5.auth_service.data.oauth.token.entity.{AccessToken, RefreshToken, TokenScope}
-import com.paranid5.auth_service.data.oauth.token.error.InvalidTokenReason
+import com.paranid5.auth_service.data.oauth.token.error.*
+import com.paranid5.auth_service.data.oauth.client.entity.AppEntity
 
 import cats.Applicative
+import cats.data.ValidatedNec
 
 import io.github.cdimascio.dotenv.Dotenv
 
 trait OAuthRepository[F[_] : Applicative, R]:
-  type TokenAttemptF[T] = F[Either[InvalidTokenReason, T]]
+  type OAuthAttemptF  [T] = F[Either[InvalidOAuthReason, T]]
+  type OAuthValidatedF[T] = F[ValidatedNec[InvalidOAuthReason, T]]
+  type TokenAttemptF  [T] = F[Either[InvalidTokenReason, T]]
+  type TokenValidatedF[T] = F[ValidatedNec[InvalidTokenReason, T]]
 
-  def connect(dotenv: Dotenv): R
+  infix def connect(dotenv: Dotenv): R
 
   extension (repository: R)
     def getClientWithTokens(
@@ -29,14 +34,39 @@ trait OAuthRepository[F[_] : Applicative, R]:
       clientSecret: String
     ): F[Boolean]
 
-    def storeClient(
+    def insertClient(
       clientId:     Long,
       clientSecret: String
     ): F[Unit]
 
-    def deleteClient(clientId: Long): F[Unit]
+    infix def deleteClient(clientId: Long): F[Unit]
 
-    def getClientAccessTokens(clientId: Long): F[List[AccessToken]]
+    infix def getClientApps(clientId: Long): F[List[AppEntity]]
+
+    def getApp(
+      appId:     Long,
+      appSecret: String
+    ): F[Option[AppEntity]]
+
+    def insertApp(
+      appId:        Long,
+      appSecret:    String,
+      appName:      String,
+      appThumbnail: Option[String],
+      callbackUrl:  Option[String],
+      clientId:     Long,
+    ): F[Unit]
+
+    infix def deleteApp(appId: Long): F[Unit]
+
+    def updateApp(
+      appId:           Long,
+      newAppName:      String,
+      newAppThumbnail: Option[String],
+      newCallbackUrl:  Option[String],
+    ): F[Unit]
+
+    infix def getClientAccessTokens(clientId: Long): F[List[AccessToken]]
 
     def newAccessToken(
       refreshToken:     RefreshToken,
@@ -49,3 +79,12 @@ trait OAuthRepository[F[_] : Applicative, R]:
       clientId:     Long,
       clientSecret: String
     ): TokenAttemptF[RefreshToken]
+
+    def deleteAccessTokenWithScopes(
+      clientId: Long,
+      title:    String
+    ): OAuthValidatedF[Unit]
+
+    infix def deleteClientTokensWithScopes(
+      clientId: Long
+    ): OAuthValidatedF[Unit]

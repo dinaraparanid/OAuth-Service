@@ -3,7 +3,9 @@ package com.paranid5.auth_service.data.oauth.token
 import com.paranid5.auth_service.data.oauth.token.entity.{RefreshToken, TokenEntity, TokenStatus, isActual}
 import com.paranid5.auth_service.data.oauth.token.error.InvalidTokenReason
 import com.paranid5.auth_service.data.ops.*
+
 import cats.syntax.all.*
+
 import doobie.free.connection.ConnectionIO
 import doobie.implicits.toSqlInterpolator
 import doobie.util.fragment.Fragment
@@ -11,19 +13,19 @@ import doobie.util.fragment.Fragment
 final class PostgresTokenDataSource
 
 object PostgresTokenDataSource:
-  private val RefreshTokenAliveTime = 2_592_000_000L // 30 days
+  private val RefreshTokenAliveTime: Long = 1000 * 60 * 60 * 24 // 1 day
 
   given TokenDataSource[ConnectionIO, PostgresTokenDataSource] with
     override type TokenAttemptF[T] = ConnectionIO[Either[InvalidTokenReason, T]]
 
     extension (source: PostgresTokenDataSource)
-      override def getClientAccessTokens(clientId: Long): ConnectionIO[List[TokenEntity]] =
+      override infix def getClientAccessTokens(clientId: Long): ConnectionIO[List[TokenEntity]] =
         sql"""
         SELECT * FROM "Token"
         WHERE client_id = $clientId AND status = "access"
         """.list[TokenEntity]
 
-      override def getClientRefreshToken(clientId: Long): ConnectionIO[Option[RefreshToken]] =
+      override infix def getClientRefreshToken(clientId: Long): ConnectionIO[Option[RefreshToken]] =
         sql"""
         SELECT * FROM "Token"
         WHERE client_id = $clientId AND status = "refresh"
@@ -36,6 +38,15 @@ object PostgresTokenDataSource:
         sql"""
         SELECT * FROM "Token"
         WHERE client_id = $clientId AND value = $tokenValue
+        """.option[TokenEntity]
+
+      override def getTokenByTitle(
+        clientId:   Long,
+        tokenTitle: String
+      ): ConnectionIO[Option[TokenEntity]] =
+        sql"""
+        SELECT * FROM "Token"
+        WHERE client_id = $clientId AND title = $tokenTitle
         """.option[TokenEntity]
 
       override def newAccessToken(
@@ -92,7 +103,7 @@ object PostgresTokenDataSource:
         WHERE client_id = $clientId AND title = $title AND value = $value
         """.option[TokenEntity]
 
-      override def removeToken(
+      override def deleteToken(
         clientId: Long,
         title:    Option[String]
       ): TokenAttemptF[Unit] =

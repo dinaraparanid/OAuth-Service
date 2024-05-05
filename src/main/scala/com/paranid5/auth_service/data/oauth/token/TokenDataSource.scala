@@ -9,13 +9,18 @@ trait TokenDataSource[F[_] : Applicative, S]:
   type TokenAttemptF[T] = F[Either[InvalidTokenReason, T]]
 
   extension (source: S)
-    def getClientAccessTokens(clientId: Long): F[List[TokenEntity]]
+    infix def getClientAccessTokens(clientId: Long): F[List[TokenEntity]]
 
-    def getClientRefreshToken(clientId: Long): F[Option[TokenEntity]]
+    infix def getClientRefreshToken(clientId: Long): F[Option[TokenEntity]]
 
     def getToken(
       clientId:     Long,
       tokenValue:   String
+    ): F[Option[TokenEntity]]
+
+    def getTokenByTitle(
+      clientId:   Long,
+      tokenTitle: String
     ): F[Option[TokenEntity]]
 
     def newAccessToken(
@@ -39,7 +44,7 @@ trait TokenDataSource[F[_] : Applicative, S]:
       value:    String
     ): F[Option[TokenEntity]]
 
-    def removeToken(
+    def deleteToken(
       clientId: Long,
       title:    Option[String]
     ): TokenAttemptF[Unit]

@@ -3,8 +3,6 @@ package com.paranid5.auth_service.data.oauth.client
 import com.paranid5.auth_service.data.oauth.client.entity.ClientEntity
 import com.paranid5.auth_service.data.ops.*
 
-import cats.effect.IO
-
 import doobie.free.connection.ConnectionIO
 import doobie.implicits.toSqlInterpolator
 
@@ -26,7 +24,7 @@ object PostgresClientDataSource:
         WHERE client_id = $clientId AND client_secret = $clientSecret
         """.option[ClientEntity]
 
-      override def storeClient(
+      override def insertClient(
         clientId:     Long,
         clientSecret: String
       ): ConnectionIO[Unit] =
@@ -35,6 +33,6 @@ object PostgresClientDataSource:
         VALUES ($clientId, $clientSecret)
         """.effect
 
-      override def deleteClient(clientId: Long): ConnectionIO[Unit] =
+      override infix def deleteClient(clientId: Long): ConnectionIO[Unit] =
         sql"""DELETE FROM  "Client" WHERE client_id = $clientId""".effect
 
