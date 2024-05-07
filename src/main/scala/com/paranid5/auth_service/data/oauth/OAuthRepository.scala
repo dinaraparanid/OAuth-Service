@@ -1,5 +1,6 @@
 package com.paranid5.auth_service.data.oauth
 
+import com.paranid5.auth_service.data.IOTransactor
 import com.paranid5.auth_service.data.oauth.token.entity.{AccessToken, RefreshToken, TokenScope}
 import com.paranid5.auth_service.data.oauth.token.error.*
 import com.paranid5.auth_service.data.oauth.client.entity.AppEntity
@@ -7,17 +8,15 @@ import com.paranid5.auth_service.data.oauth.client.entity.AppEntity
 import cats.Applicative
 import cats.data.ValidatedNec
 
-import io.github.cdimascio.dotenv.Dotenv
-
 trait OAuthRepository[F[_] : Applicative, R]:
   type OAuthAttemptF  [T] = F[Either[InvalidOAuthReason, T]]
   type OAuthValidatedF[T] = F[ValidatedNec[InvalidOAuthReason, T]]
   type TokenAttemptF  [T] = F[Either[InvalidTokenReason, T]]
   type TokenValidatedF[T] = F[ValidatedNec[InvalidTokenReason, T]]
 
-  infix def connect(dotenv: Dotenv): R
-
   extension (repository: R)
+    def createTables(): F[Unit]
+
     def getClientWithTokens(
       clientId:     Long,
       clientSecret: String
@@ -39,9 +38,9 @@ trait OAuthRepository[F[_] : Applicative, R]:
       clientSecret: String
     ): F[Unit]
 
-    infix def deleteClient(clientId: Long): F[Unit]
+    def deleteClient(clientId: Long): F[Unit]
 
-    infix def getClientApps(clientId: Long): F[List[AppEntity]]
+    def getClientApps(clientId: Long): F[List[AppEntity]]
 
     def getApp(
       appId:     Long,
@@ -57,7 +56,11 @@ trait OAuthRepository[F[_] : Applicative, R]:
       clientId:     Long,
     ): F[Unit]
 
-    infix def deleteApp(appId: Long): F[Unit]
+    def deleteApp(
+      clientId:  Long,
+      appId:     Long,
+      appSecret: String
+    ): F[Unit]
 
     def updateApp(
       appId:           Long,
@@ -66,7 +69,7 @@ trait OAuthRepository[F[_] : Applicative, R]:
       newCallbackUrl:  Option[String],
     ): F[Unit]
 
-    infix def getClientAccessTokens(clientId: Long): F[List[AccessToken]]
+    def getClientAccessTokens(clientId: Long): F[List[AccessToken]]
 
     def newAccessToken(
       refreshToken:     RefreshToken,
@@ -85,6 +88,6 @@ trait OAuthRepository[F[_] : Applicative, R]:
       title:    String
     ): OAuthValidatedF[Unit]
 
-    infix def deleteClientTokensWithScopes(
+    def deleteClientTokensWithScopes(
       clientId: Long
     ): OAuthValidatedF[Unit]

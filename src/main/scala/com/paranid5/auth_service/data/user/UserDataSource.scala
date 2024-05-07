@@ -6,7 +6,11 @@ import com.paranid5.auth_service.data.user.entity.User
 
 trait UserDataSource[F[_] : Applicative, S]:
   extension (source: S)
+    def createTable(): F[Unit]
+
     def users: F[List[User]]
+
+    def getUser(userId: Long): F[Option[User]]
 
     def storeUser(
       userId:          Long,
@@ -15,7 +19,7 @@ trait UserDataSource[F[_] : Applicative, S]:
       encodedPassword: String
     ): F[Unit]
 
-    infix def storeUser(user: User): F[Unit] =
+    def storeUser(user: User): F[Unit] =
       source.storeUser(
         userId          = user.userId,
         username        = user.username,
@@ -23,9 +27,9 @@ trait UserDataSource[F[_] : Applicative, S]:
         encodedPassword = user.encodedPassword
       )
 
-    infix def storeUsers(users: List[User]): F[Unit] =
+    def storeUsers(users: List[User]): F[Unit] =
       users
-        .map(source storeUser _)
+        .map(source.storeUser)
         .sequence
         .map(_ ⇒ ())
 
@@ -36,7 +40,7 @@ trait UserDataSource[F[_] : Applicative, S]:
       newEncodedPassword: String
     ): F[Unit]
 
-    infix def updateUser(updatedUser: User): F[Unit] =
+    def updateUser(updatedUser: User): F[Unit] =
       source.updateUser(
         userId             = updatedUser.userId,
         newUsername        = updatedUser.username,
@@ -44,10 +48,10 @@ trait UserDataSource[F[_] : Applicative, S]:
         newEncodedPassword = updatedUser.encodedPassword
       )
 
-    infix def updateUsers(updatedUsers: List[User]): F[Unit] =
+    def updateUsers(updatedUsers: List[User]): F[Unit] =
       updatedUsers
-        .map(source updateUser _)
+        .map(source.updateUser)
         .sequence
         .map(_ ⇒ ())
 
-    infix def deleteUser(userId: Long): F[Unit]
+    def deleteUser(userId: Long): F[Unit]

@@ -9,9 +9,11 @@ trait TokenDataSource[F[_] : Applicative, S]:
   type TokenAttemptF[T] = F[Either[InvalidTokenReason, T]]
 
   extension (source: S)
-    infix def getClientAccessTokens(clientId: Long): F[List[TokenEntity]]
+    def createTable(): F[Unit]
 
-    infix def getClientRefreshToken(clientId: Long): F[Option[TokenEntity]]
+    def getClientAccessTokens(clientId: Long): F[List[TokenEntity]]
+
+    def getClientRefreshToken(clientId: Long): F[Option[TokenEntity]]
 
     def getToken(
       clientId:     Long,

@@ -11,10 +11,22 @@ final class PostgresAppDataSource
 object PostgresAppDataSource:
   given AppDataSource[ConnectionIO, PostgresAppDataSource] with
     extension (source: PostgresAppDataSource)
-      override infix def getClientApps(clientId: Long): ConnectionIO[List[AppEntity]] =
+      override def createTable(): ConnectionIO[Unit] =
+        sql"""
+        CREATE TABLE IF NOT EXISTS "App" (
+          app_id SERIAL PRIMARY KEY,
+          app_secret TEXT NOT NULL UNIQUE,
+          app_name TEXT NOT NULL,
+          thumbnail TEXT,
+          callback_url TEXT,
+          client_id INTEGER NOT NULL REFERENCES "Client"(client_id)
+        )
+        """.effect
+
+      override def getClientApps(clientId: Long): ConnectionIO[List[AppEntity]] =
         sql"""SELECT * FROM "App" WHERE client_id = $clientId""".list[AppEntity]
 
-      override infix def getApp(
+      override def getApp(
         appId:     Long,
         appSecret: String
       ): ConnectionIO[Option[AppEntity]] =
@@ -23,7 +35,7 @@ object PostgresAppDataSource:
         WHERE app_id = $appId AND app_secret = $appSecret
         """.option[AppEntity]
 
-      override infix def insertApp(
+      override def insertApp(
         appId:        Long,
         appSecret:    String,
         appName:      String,
@@ -36,10 +48,10 @@ object PostgresAppDataSource:
         VALUES ($appId, $appSecret, $appName, $appThumbnail, $callbackUrl, $clientId)
         """.effect
 
-      override infix def deleteApp(appId: Long): ConnectionIO[Unit] =
+      override def deleteApp(appId: Long): ConnectionIO[Unit] =
         sql"""DELETE FROM "App" WHERE app_id = $appId""".effect
 
-      override infix def deleteClientApps(clientId: Long): ConnectionIO[Unit] =
+      override def deleteClientApps(clientId: Long): ConnectionIO[Unit] =
         sql""" DELETE FROM "App" WHERE client_id = $clientId""".effect
 
       override def updateApp(

@@ -19,13 +19,26 @@ object PostgresTokenDataSource:
     override type TokenAttemptF[T] = ConnectionIO[Either[InvalidTokenReason, T]]
 
     extension (source: PostgresTokenDataSource)
-      override infix def getClientAccessTokens(clientId: Long): ConnectionIO[List[TokenEntity]] =
+      override def createTable(): ConnectionIO[Unit] =
+        sql"""
+        CREATE TABLE IF NOT EXISTS "Token" (
+          client_id INTEGER NOT NULL REFERENCES "Client"(client_id),
+          title TEXT,
+          value TEXT NOT NULL,
+          life_seconds INTEGER,
+          created_at INTEGER NOT NULL,
+          status VARCHAR(10) NOT NULL,
+          PRIMARY KEY (client_id, title, value)
+        )
+        """.effect
+
+      override def getClientAccessTokens(clientId: Long): ConnectionIO[List[TokenEntity]] =
         sql"""
         SELECT * FROM "Token"
         WHERE client_id = $clientId AND status = "access"
         """.list[TokenEntity]
 
-      override infix def getClientRefreshToken(clientId: Long): ConnectionIO[Option[RefreshToken]] =
+      override def getClientRefreshToken(clientId: Long): ConnectionIO[Option[RefreshToken]] =
         sql"""
         SELECT * FROM "Token"
         WHERE client_id = $clientId AND status = "refresh"

@@ -1,9 +1,9 @@
 package com.paranid5.auth_service.data.oauth
 
-import com.paranid5.auth_service.data.IOTransactor
+import com.paranid5.auth_service.data.*
 import com.paranid5.auth_service.data.oauth.client.{PostgresAppDataSource, PostgresClientDataSource}
 import com.paranid5.auth_service.data.oauth.client.entity.AppEntity
-import com.paranid5.auth_service.data.oauth.token.entity.{AccessToken, RefreshToken, TokenScope}
+import com.paranid5.auth_service.data.oauth.token.entity.{AccessToken, RefreshToken, TokenEntity, TokenScope}
 import com.paranid5.auth_service.data.oauth.token.error.*
 import com.paranid5.auth_service.data.oauth.token.{PostgresTokenDataSource, PostgresTokenScopeDataSource}
 import com.paranid5.auth_service.token.generateToken
@@ -27,10 +27,6 @@ final class PostgresOAuthRepository(
 )
 
 object PostgresOAuthRepository:
-  private val PostgresDbUrl      = "POSTGRES_DB_URL"
-  private val PostgresDbUser     = "POSTGRES_DB_USER"
-  private val PostgresDbPassword = "POSTGRES_DB_PASSWORD"
-
   private type OAuthAttemptCIO     [T] = ConnectionIO[Either[InvalidOAuthReason, T]]
   private type OAuthValidatedCIO   [T] = ConnectionIO[ValidatedNec[InvalidOAuthReason, T]]
   private type TokenAttemptCIO     [T] = ConnectionIO[Either[InvalidTokenReason, T]]
@@ -43,24 +39,18 @@ object PostgresOAuthRepository:
     override type TokenAttemptF  [T] = IO[Either[InvalidTokenReason, T]]
     override type TokenValidatedF[T] = IO[ValidatedNec[InvalidTokenReason, T]]
 
-    override infix def connect(dotenv: Dotenv): PostgresOAuthRepository =
-      val transactor = Transactor.fromDriverManager[IO](
-        driver       = "org.postgresql.Driver",
-        url          = dotenv `get` PostgresDbUrl,
-        user         = dotenv `get` PostgresDbUser,
-        password     = dotenv `get` PostgresDbPassword,
-        logHandler   = None
-      )
-
-      PostgresOAuthRepository(
-        transactor           = transactor,
-        clientDataSource     = PostgresClientDataSource(),
-        appDataSource        = PostgresAppDataSource(),
-        tokenDataSource      = PostgresTokenDataSource(),
-        tokenScopeDataSource = PostgresTokenScopeDataSource()
-      )
-
     extension (repository: PostgresOAuthRepository)
+      override def createTables(): IO[Unit] =
+        def impl(): ConnectionIO[Unit] =
+          for
+            _ ← repository.clientDataSource.createTable()
+            _ ← repository.appDataSource.createTable()
+            _ ← repository.tokenDataSource.createTable()
+            _ ← repository.tokenScopeDataSource.createTable()
+          yield ()
+
+        impl() transact repository.transactor
+
       override def getClientWithTokens(
         clientId:     Long,
         clientSecret: String
@@ -68,8 +58,8 @@ object PostgresOAuthRepository:
         def impl: ConnectionIO[Option[Client]] =
           for
             client       ← repository.clientDataSource.getClient(clientId, clientSecret)
-            accessTokens ← repository getClientAccessTokensCIO clientId
-            refreshToken ← repository.tokenDataSource getClientRefreshToken clientId
+            accessTokens ← repository.getClientAccessTokensCIO(clientId)
+            refreshToken ← repository.tokenDataSource.getClientRefreshToken(clientId)
           yield client map (Client(_, accessTokens, refreshToken))
 
         impl transact repository.transactor
@@ -104,21 +94,17 @@ object PostgresOAuthRepository:
           .insertClient(clientId, clientSecret)
           .transact(repository.transactor)
 
-      override infix def deleteClient(clientId: Long): IO[Unit] =
+      override def deleteClient(clientId: Long): IO[Unit] =
         def impl(): ConnectionIO[Unit] =
           for
-            _ ← repository.clientDataSource deleteClient clientId
-            _ ← repository.appDataSource deleteClientApps clientId
+            _ ← repository.clientDataSource.deleteClient(clientId)
+            _ ← repository.appDataSource.deleteClientApps(clientId)
+            _ ← repository.deleteClientTokensWithScopesCIO(clientId)
           yield ()
 
-        // TODO: удалить со всем
+        impl() transact repository.transactor
 
-        repository
-          .clientDataSource
-          .deleteClient(clientId)
-          .transact(repository.transactor)
-
-      override infix def getClientApps(clientId: Long): IO[List[AppEntity]] =
+      override def getClientApps(clientId: Long): IO[List[AppEntity]] =
         repository
           .appDataSource
           .getClientApps(clientId)
@@ -153,11 +139,18 @@ object PostgresOAuthRepository:
           )
           .transact(repository.transactor)
 
-      override infix def deleteApp(appId: Long): IO[Unit] =
-        repository
-          .appDataSource
-          .deleteApp(appId)
-          .transact(repository.transactor)
+      override def deleteApp(
+        clientId:  Long,
+        appId:     Long,
+        appSecret: String
+      ): IO[Unit] =
+        def impl(): ConnectionIO[Unit] =
+          for
+            _ ← repository.deleteAppAccessTokenWithScopesCIO(clientId, appId, appSecret)
+            _ ← repository.appDataSource.deleteApp(appId)
+          yield ()
+
+        impl() transact repository.transactor
 
       override def updateApp(
         appId:           Long,
@@ -175,7 +168,7 @@ object PostgresOAuthRepository:
           )
           .transact(repository.transactor)
 
-      override infix def getClientAccessTokens(clientId: Long): IO[List[AccessToken]] =
+      override def getClientAccessTokens(clientId: Long): IO[List[AccessToken]] =
         repository
           .getClientAccessTokensCIO(clientId)
           .transact(repository.transactor)
@@ -197,7 +190,7 @@ object PostgresOAuthRepository:
               tokenValue   = tokenValue
             )
 
-            b ← repository.tokenScopeDataSource.addScopesToToken(
+            _ ← repository.tokenScopeDataSource.addScopesToToken(
               clientId         = refreshToken.clientId,
               accessTokenTitle = accessTokenTitle,
               scopes           = scopes
@@ -233,32 +226,12 @@ object PostgresOAuthRepository:
           .deleteAccessTokenWithScopesCIO(clientId, title)
           .transact(repository.transactor)
 
-      override infix def deleteClientTokensWithScopes(
+      override def deleteClientTokensWithScopes(
         clientId: Long
       ): IO[ValidatedNec[InvalidOAuthReason, Unit]] =
-        def deleteRefreshTokenCIO(): TokenAttemptCIO[Unit] =
-          repository.tokenDataSource.deleteToken(clientId, None)
-
-        def deleteAccessTokensWithScopesCIO(): OAuthValidatedCIO[Unit] =
-          for
-            tokens    ← repository getClientAccessTokensCIO clientId
-            removeVal ← tokens
-              .map: tok ⇒
-                repository.deleteAccessTokenWithScopesCIO(
-                  clientId = clientId,
-                  title = tok.entity.title getOrElse ""
-                )
-              .sequence
-          yield removeVal.sequence map (_ ⇒ ())
-
-        def impl(): OAuthValidatedCIO[Unit] =
-          for
-            refreshTokRes ← deleteRefreshTokenCIO()
-            accessTokVal  ← deleteAccessTokensWithScopesCIO()
-            refreshTokVal = refreshTokRes.toValidatedNec
-          yield (refreshTokVal, accessTokVal) mapN ((_, _) ⇒ ())
-
-        impl() transact repository.transactor
+        repository
+          .deleteClientTokensWithScopesCIO(clientId)
+          .transact(repository.transactor)
 
       private def isClientExistsCIO(
         clientId:     Long,
@@ -267,13 +240,47 @@ object PostgresOAuthRepository:
         for clientOpt ← repository.clientDataSource.getClient(clientId, clientSecret)
           yield clientOpt.isDefined
 
-      private infix def getClientAccessTokensCIO(
+      private def getClientAccessTokensCIO(
         clientId: Long
       ): ConnectionIO[List[AccessToken]] =
         for
           accToksE     ← repository.tokenDataSource.getClientAccessTokens(clientId)
           accessTokens ← repository.tokenScopeDataSource.getAccessTokensWithScopes(accToksE)
         yield accessTokens
+
+      private def getAppAccessTokenCIO(
+        clientId:  Long,
+        appId:     Long,
+        appSecret: String,
+      ): ConnectionIO[Option[AccessToken]] =
+        def retrieveAppToken(
+          clientApp: Option[AppEntity]
+        ): ConnectionIO[Option[TokenEntity]] =
+          clientApp
+            .map: app ⇒
+              repository
+                .tokenDataSource
+                .getTokenByTitle(clientId, app.appName)
+            .sequence
+            .map(_.flatten)
+
+        def retrieveTokenWithScope(
+          appToken: Option[TokenEntity]
+        ): ConnectionIO[Option[AccessToken]] =
+          appToken
+            .map: token ⇒
+              repository
+                .tokenScopeDataSource
+                .getAccessTokensWithScopes(List(token))
+                .map(_.headOption)
+            .sequence
+            .map(_.flatten)
+
+        for
+          app         ← repository.appDataSource.getApp(appId, appSecret)
+          token       ← retrieveAppToken(app)
+          accessToken ← retrieveTokenWithScope(token)
+        yield accessToken
 
       private def deleteAccessTokenWithScopesCIO(
         clientId: Long,
@@ -297,6 +304,42 @@ object PostgresOAuthRepository:
           rmScopesVal: ValidatedNec[InvalidOAuthReason, Unit] = rmScopesRes.toValidatedNec
           rmTokenVal:  ValidatedNec[InvalidOAuthReason, Unit] = rmTokenRes.toValidatedNec
         yield (rmScopesVal, rmTokenVal) mapN ((_, _) ⇒ ())
+
+      private def deleteClientTokensWithScopesCIO(clientId: Long): OAuthValidatedCIO[Unit] =
+        for
+          accessTokens  ← repository.getClientAccessTokensCIO(clientId)
+          accessTokVal  ← deleteAccessTokensWithScopesCIO(clientId, accessTokens)
+          refreshTokRes ← deleteRefreshTokenCIO(clientId)
+          refreshTokVal = refreshTokRes.toValidatedNec
+        yield (refreshTokVal, accessTokVal) mapN ((_, _) ⇒ ())
+
+      private def deleteAppAccessTokenWithScopesCIO(
+        clientId:  Long,
+        appId:     Long,
+        appSecret: String,
+      ): OAuthValidatedCIO[Unit] =
+        for
+          accessToken  ← repository.getAppAccessTokenCIO(clientId, appId, appSecret)
+          accessTokens = accessToken map (List(_)) getOrElse Nil
+          accessTokVal ← deleteAccessTokensWithScopesCIO(clientId, accessTokens)
+        yield accessTokVal
+
+      private def deleteAccessTokensWithScopesCIO(
+        clientId: Long,
+        tokens:   List[AccessToken]
+      ): OAuthValidatedCIO[Unit] =
+        for
+          removeVal ← tokens
+            .map: tok ⇒
+              repository.deleteAccessTokenWithScopesCIO(
+                clientId = clientId,
+                title    = tok.entity.title getOrElse ""
+              )
+            .sequence
+        yield removeVal.sequence map (_ ⇒ ())
+
+      private def deleteRefreshTokenCIO(clientId: Long): TokenAttemptCIO[Unit] =
+        repository.tokenDataSource.deleteToken(clientId, None)
 
       private def transactToken[T](tokenValueRes: Either[Throwable, String])(
         newToken: String ⇒ TokenAttemptCIO[T]

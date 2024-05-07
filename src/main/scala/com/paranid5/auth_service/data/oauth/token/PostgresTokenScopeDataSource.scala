@@ -17,6 +17,16 @@ object PostgresTokenScopeDataSource:
     override type TokenScopeAttemptF[T] = ConnectionIO[Either[InvalidScopeReason, T]]
 
     extension (source: PostgresTokenScopeDataSource)
+      override def createTable(): ConnectionIO[Unit] =
+        sql"""
+        CREATE TABLE IF NOT EXISTS "Token_Scope" (
+          client_id INTEGER NOT NULL REFERENCES "Token"(client_id),
+          token_title TEXT NOT NULL REFERENCES "Token"(title),
+          scope TEXT NOT NULL,
+          PRIMARY KEY (client_id, token_title, scope)
+        )
+        """.effect
+
       override def getTokenScopes(
         clientId:         Long,
         accessTokenTitle: String
@@ -32,7 +42,7 @@ object PostgresTokenScopeDataSource:
         scope:            String
       ): ConnectionIO[Either[InvalidScopeReason, Unit]] =
         sql"""
-        INSERT INTO "Token_Scope" (cleint_id, token_title, scope)
+        INSERT INTO "Token_Scope" (client_id, token_title, scope)
         VALUES ($clientId, $accessTokenTitle, $scope)
         """.attemptInsert
 

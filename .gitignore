@@ -14,5 +14,6 @@ hs_err_pid*
 builds
 target
 project/target
+.env
 
 # End of https://www.toptal.com/developers/gitignore/api/scala

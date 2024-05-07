@@ -7,7 +7,9 @@ import com.paranid5.auth_service.data.oauth.client.entity.AppEntity
 
 trait AppDataSource[F[_] : Applicative, S]:
   extension (source: S)
-    infix def getClientApps(clientId: Long): F[List[AppEntity]]
+    def createTable(): F[Unit]
+
+    def getClientApps(clientId: Long): F[List[AppEntity]]
 
     def getApp(
       appId:     Long,
@@ -23,7 +25,7 @@ trait AppDataSource[F[_] : Applicative, S]:
       clientId:     Long,
     ): F[Unit]
 
-    infix def insertApp(app: AppEntity): F[Unit] =
+    def insertApp(app: AppEntity): F[Unit] =
       source.insertApp(
         appId        = app.appId,
         appSecret    = app.appSecret,
@@ -33,15 +35,15 @@ trait AppDataSource[F[_] : Applicative, S]:
         clientId     = app.clientId,
       )
 
-    infix def insertApps(apps: List[AppEntity]): F[Unit] =
+    def insertApps(apps: List[AppEntity]): F[Unit] =
       apps
-        .map(source insertApp _)
+        .map(source.insertApp)
         .sequence
         .map(_ ⇒ ())
 
-    infix def deleteApp(appId: Long): F[Unit]
+    def deleteApp(appId: Long): F[Unit]
 
-    infix def deleteClientApps(clientId: Long): F[Unit]
+    def deleteClientApps(clientId: Long): F[Unit]
 
     def updateApp(
       appId:           Long,

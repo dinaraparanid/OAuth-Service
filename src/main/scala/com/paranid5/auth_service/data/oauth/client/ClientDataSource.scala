@@ -6,6 +6,8 @@ import com.paranid5.auth_service.data.oauth.client.entity.ClientEntity
 
 trait ClientDataSource[F[_] : Applicative, S]:
   extension (source: S)
+    def createTable(): F[Unit]
+
     def clients: F[List[ClientEntity]]
 
     def getClient(
@@ -18,17 +20,17 @@ trait ClientDataSource[F[_] : Applicative, S]:
       clientSecret: String
     ): F[Unit]
 
-    infix def insertClient(client: ClientEntity): F[Unit] =
+    def insertClient(client: ClientEntity): F[Unit] =
       source.insertClient(
         clientId     = client.clientId,
         clientSecret = client.clientSecret
       )
 
-    infix def insertClients(clients: List[ClientEntity]): F[Unit] =
+    def insertClients(clients: List[ClientEntity]): F[Unit] =
       clients
-        .map(source insertClient _)
+        .map(source.insertClient)
         .sequence
         .map(_ ⇒ ())
 
-    infix def deleteClient(clientId: Long): F[Unit]
+    def deleteClient(clientId: Long): F[Unit]
 

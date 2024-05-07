@@ -10,6 +10,8 @@ trait TokenScopeDataSource[F[_] : Applicative, S]:
   type TokenScopeAttemptF[T] = F[Either[InvalidScopeReason, T]]
 
   extension (source: S)
+    def createTable(): F[Unit]
+
     def getTokenScopes(
       clientId:         Long,
       accessTokenTitle: String,

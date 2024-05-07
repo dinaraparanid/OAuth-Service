@@ -11,8 +11,21 @@ final class PostgresUserDataSource
 object PostgresUserDataSource:
   given UserDataSource[ConnectionIO, PostgresUserDataSource] with
     extension (source: PostgresUserDataSource)
+      override def createTable(): ConnectionIO[Unit] =
+        sql"""
+        CREATE TABLE IF NOT EXISTS "User" (
+          user_id SERIAL PRIMARY KEY,
+          username TEXT NOT NULL,
+          email TEXT NOT NULL,
+          password TEXT NOT NULL
+        )
+        """.effect
+
       override def users: ConnectionIO[List[User]] =
         sql"""SELECT * FROM "User"""".list[User]
+
+      override def getUser(userId: Long): ConnectionIO[Option[User]] =
+        sql"""SELECT * FROM "User" WHERE user_id = $userId""".option[User]
 
       override def storeUser(
         userId:          Long,

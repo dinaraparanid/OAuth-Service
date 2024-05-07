@@ -1,4 +1,4 @@
-package com.paranid5.auth_service.oauth
+package com.paranid5.auth_service.routing.oauth
 
 import com.paranid5.auth_service.data.user.entity.User
 import scalaoauth2.provider.{AccessToken, AuthInfo, AuthorizationRequest, ClientCredential, DataHandler}

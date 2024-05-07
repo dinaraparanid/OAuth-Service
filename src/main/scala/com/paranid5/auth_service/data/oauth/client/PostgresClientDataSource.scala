@@ -11,6 +11,14 @@ final class PostgresClientDataSource
 object PostgresClientDataSource:
   given ClientDataSource[ConnectionIO, PostgresClientDataSource] with
     extension (source: PostgresClientDataSource)
+      override def createTable(): ConnectionIO[Unit] =
+        sql"""
+        CREATE TABLE IF NOT EXISTS "Client" (
+          client_id SERIAL PRIMARY KEY REFERENCES "User"(user_id),
+          client_secret TEXT NOT NULL
+        )
+        """.effect
+
       override def clients: ConnectionIO[List[ClientEntity]] =
         sql"""SELECT * FROM "Client"""".list[ClientEntity]
 
@@ -33,6 +41,6 @@ object PostgresClientDataSource:
         VALUES ($clientId, $clientSecret)
         """.effect
 
-      override infix def deleteClient(clientId: Long): ConnectionIO[Unit] =
+      override def deleteClient(clientId: Long): ConnectionIO[Unit] =
         sql"""DELETE FROM  "Client" WHERE client_id = $clientId""".effect
 
