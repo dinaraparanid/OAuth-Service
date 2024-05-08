@@ -1,11 +1,14 @@
 package com.paranid5.auth_service.di
 
+import cats.data.Reader
 import cats.effect.IO
 import cats.syntax.all.*
 
 import com.paranid5.auth_service.data.{IOTransactor, getTransactor}
 
 import io.github.cdimascio.dotenv.Dotenv
+
+type AppDependencies[F] = Reader[AppModule, F]
 
 final class AppModule(val dotenv: Dotenv):
   lazy val transcactor: IOTransactor = getTransactor(dotenv)

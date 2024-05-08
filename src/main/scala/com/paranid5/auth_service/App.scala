@@ -6,7 +6,7 @@ import cats.syntax.all.*
 
 import com.comcast.ip4s.{ipv4, port}
 
-import com.paranid5.auth_service.di.AppModule
+import com.paranid5.auth_service.di.{AppModule, AppDependencies}
 import com.paranid5.auth_service.routing.auth.authRouter
 import com.paranid5.auth_service.routing.oauth.oauthRouter
 
@@ -18,7 +18,7 @@ object App extends IOApp:
     AppModule(runServer() run _) map:
       _.fold(fa = _ ⇒ ExitCode.Error, fb = _ ⇒ ExitCode.Success)
 
-  private def runServer(): Reader[AppModule, IO[ExitCode]] =
+  private def runServer(): AppDependencies[IO[ExitCode]] =
     Reader: appModule ⇒
       EmberServerBuilder
         .default[IO]
@@ -29,6 +29,8 @@ object App extends IOApp:
         .use(_ => IO.never)
         .as(ExitCode.Success)
 
-  private def authService: Reader[AppModule, Kleisli[IO, Request[IO], Response[IO]]] =
-    Reader: appModule ⇒
-      (authRouter <+> oauthRouter).orNotFound
+  private def authService: AppDependencies[Kleisli[IO, Request[IO], Response[IO]]] =
+    for
+      auth  ← authRouter
+      oauth ← oauthRouter
+    yield (auth <+> oauth).orNotFound
