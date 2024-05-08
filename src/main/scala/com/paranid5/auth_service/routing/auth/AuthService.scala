@@ -3,13 +3,14 @@ package com.paranid5.auth_service.routing.auth
 import cats.data.Reader
 import cats.effect.IO
 
-import com.paranid5.auth_service.di.{AppDependencies, AppModule}
 import com.paranid5.auth_service.routing.*
+import com.paranid5.auth_service.routing.auth.entity.LoginPasswordEntity
 
-import org.http4s.{HttpRoutes, Request, Response}
+import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
 import org.http4s.dsl.io.*
+import org.http4s.{HttpRoutes, Request, Response}
 
-def authRouter: AppRoutes =
+def authService: AppRoutes =
   Reader: appModule ⇒
     HttpRoutes
       .of[IO]:
@@ -24,7 +25,10 @@ def authRouter: AppRoutes =
 
 private def onSignUp(query: Request[IO]): AppHttpResponse =
   Reader: appModule ⇒
-    Ok("Sign Up")
+    for
+      loginPassword ← query.as[LoginPasswordEntity]
+      resp          ← Ok(s"Sign Up $loginPassword")
+    yield resp
 
 private def onSignIn(query: Request[IO]): AppHttpResponse =
   Reader: appModule ⇒

@@ -1,13 +1,11 @@
 package com.paranid5.auth_service.data.user
 
+import cats.effect.IO
+
 import com.paranid5.auth_service.data.*
 import com.paranid5.auth_service.data.user.entity.User
 
-import cats.effect.IO
-
 import doobie.syntax.all.*
-
-import io.github.cdimascio.dotenv.Dotenv
 
 final class PostgresUserRepository(
   private val transactor:     IOTransactor,

@@ -9,7 +9,7 @@ import com.paranid5.auth_service.routing.*
 import org.http4s.{HttpRoutes, Request, Response}
 import org.http4s.dsl.io.*
 
-def oauthRouter: AppRoutes =
+def oauthService: AppRoutes =
   Reader: appModule ⇒
     HttpRoutes
       .of[IO]:

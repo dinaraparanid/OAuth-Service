@@ -2,15 +2,15 @@ package com.paranid5.auth_service
 
 import cats.data.{Kleisli, Reader}
 import cats.effect.{ExitCode, IO, IOApp}
-import cats.syntax.all.*
 
 import com.comcast.ip4s.{ipv4, port}
 
-import com.paranid5.auth_service.di.{AppModule, AppDependencies}
-import com.paranid5.auth_service.routing.auth.authRouter
-import com.paranid5.auth_service.routing.oauth.oauthRouter
+import com.paranid5.auth_service.di.{AppDependencies, AppModule}
+import com.paranid5.auth_service.routing.auth.authService
+import com.paranid5.auth_service.routing.oauth.oauthService
 
 import org.http4s.ember.server.EmberServerBuilder
+import org.http4s.server.Router
 import org.http4s.{Request, Response}
 
 object App extends IOApp:
@@ -24,13 +24,13 @@ object App extends IOApp:
         .default[IO]
         .withHost(ipv4"0.0.0.0")
         .withPort(port"4000")
-        .withHttpApp(authService run appModule)
+        .withHttpApp(appService run appModule)
         .build
         .use(_ => IO.never)
         .as(ExitCode.Success)
 
-  private def authService: AppDependencies[Kleisli[IO, Request[IO], Response[IO]]] =
+  private def appService: AppDependencies[Kleisli[IO, Request[IO], Response[IO]]] =
     for
-      auth  ← authRouter
-      oauth ← oauthRouter
-    yield (auth <+> oauth).orNotFound
+      auth  ← authService
+      oauth ← oauthService
+    yield Router("/auth" -> auth, "/oauth" -> oauth).orNotFound

@@ -12,7 +12,6 @@ lazy val root = (project in file("."))
       "org.http4s"          %% "http4s-circe"                  % "0.23.26",
       "io.circe"            %% "circe-generic"                 % "0.14.7",
       "io.circe"            %% "circe-literal"                 % "0.14.7",
-      "com.nulab-inc"       %% "scala-oauth2-core"             % "1.6.0",
       "org.tpolecat"        %% "doobie-core"                   % "1.0.0-RC4",
       "org.tpolecat"        %% "doobie-postgres"               % "1.0.0-RC4",
       "io.github.cdimascio"  % "dotenv-kotlin"                  % "6.4.1",
