@@ -71,7 +71,7 @@ trait OAuthRepository[F[_] : Applicative, R]:
       newCallbackUrl:  Option[String],
     ): F[Unit]
 
-    def getClientAccessTokens(clientId: Long): F[List[AccessToken]]
+    def getPlatformClientAccessToken(clientId: Long): F[Option[AccessToken]]
 
     def getAppAccessToken(
       clientId:  Long,

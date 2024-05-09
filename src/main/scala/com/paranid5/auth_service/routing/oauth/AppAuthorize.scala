@@ -7,7 +7,7 @@ import com.paranid5.auth_service.data.oauth.client.entity.AppEntity
 import com.paranid5.auth_service.data.oauth.token.entity.AccessToken
 import com.paranid5.auth_service.data.oauth.token.error
 import com.paranid5.auth_service.data.oauth.token.error.InvalidTokenReason
-import com.paranid5.auth_service.routing.AppHttpResponse
+import com.paranid5.auth_service.routing.{AppHttpResponse, redirectToCallbackUrl}
 import com.paranid5.auth_service.routing.oauth.entity.AuthorizeRequest
 
 import org.http4s.circe.CirceEntityCodec.{circeEntityDecoder, circeEntityEncoder}
@@ -36,11 +36,9 @@ private def invalidToken: InvalidTokenReason ⇒ IO[Response[IO]] =
   case InvalidTokenReason.NotFound        ⇒ tokenNotFound
   case InvalidTokenReason.GenerationError ⇒ somethingWentWrong
 
-private def redirectToCallbackUrl(callbackUrl: Option[String]): IO[Response[IO]] =
-  Found(callbackUrl getOrElse DefaultRedirect)
-
 /**
- * Validates access token for authorization in client app
+ * Validates access token for authorization for client app.
+ * Redirects either to provided callback url, app's callback url or the [[DefaultRedirect]]
  *
  * ==Route==
  * POST /oauth/authorize?client_id=123&app_id=123&app_secret=secret&redirect_url=https://...
@@ -102,12 +100,13 @@ private def onAppAuthorize(
       app:          AppEntity
     ): IO[Response[IO]] =
       for
-        tokenOpt ← oauthRepository.getAppAccessToken(clientId, appId, appSecret)
-        response ← processToken(app.callbackUrl, requestToken, tokenOpt)
+        tokenOpt    ← oauthRepository.getAppAccessToken(clientId, appId, appSecret)
+        callbackUrl = app.callbackUrl getOrElse (redirectUrl getOrElse DefaultRedirect)
+        response    ← processToken(callbackUrl, requestToken, tokenOpt)
       yield response
 
     def processToken(
-      callbackUrl:       Option[String],
+      callbackUrl:       String,
       requestToken:      String,
       retrievedTokenOpt: Option[AccessToken]
     ): IO[Response[IO]] =
@@ -117,7 +116,7 @@ private def onAppAuthorize(
       )
 
     def validateToken(
-      callbackUrl: Option[String],
+      callbackUrl: String,
       token:       AccessToken
     ): IO[Response[IO]] =
       for

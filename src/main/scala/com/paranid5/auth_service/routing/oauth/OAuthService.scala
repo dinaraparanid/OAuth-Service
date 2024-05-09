@@ -26,7 +26,7 @@ def oauthService: AppRoutes =
       case query @ POST → (Root / "authorize") // принимает auth JWT токен в body, редиректит на страницу приложения авторизации
         :? ClientIdParamMatcher(clientId)
         +& RedirectUrlParamMatcher(redirectUrl) ⇒
-        Ok("Authorize for service app")
+        onPlatformAuthorize(query, clientId, redirectUrl) run appModule
 
       case query @ POST → (Root / "authorize") // принимает auth JWT токен в body, редиректит на страницу клиентского приложения
         :? ClientIdParamMatcher(clientId)

@@ -38,6 +38,14 @@ object PostgresTokenDataSource:
         WHERE client_id = $clientId AND status = "access"
         """.list[TokenEntity]
 
+      override def getPlatformClientAccessToken(
+        clientId: Long
+      ): ConnectionIO[Option[TokenEntity]] =
+        sql"""
+        SELECT * FROM "Token"
+        WHERE client_id = $clientId AND status = "access" AND title = ""
+        """.option[TokenEntity]
+
       override def getClientRefreshToken(clientId: Long): ConnectionIO[Option[RefreshToken]] =
         sql"""
         SELECT * FROM "Token"

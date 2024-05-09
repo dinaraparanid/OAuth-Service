@@ -177,9 +177,9 @@ object PostgresOAuthRepository:
           )
           .transact(repository.transactor)
 
-      override def getClientAccessTokens(clientId: Long): IO[List[AccessToken]] =
+      override def getPlatformClientAccessToken(clientId: Long): IO[Option[AccessToken]] =
         repository
-          .getClientAccessTokensCIO(clientId)
+          .getPlatformClientAccessTokenCIO(clientId)
           .transact(repository.transactor)
 
       override def getAppAccessToken(
@@ -299,6 +299,15 @@ object PostgresOAuthRepository:
           token       ← retrieveAppToken(app)
           accessToken ← retrieveTokenWithScope(token)
         yield accessToken
+
+      private def getPlatformClientAccessTokenCIO(
+        clientId: Long
+      ): ConnectionIO[Option[AccessToken]] =
+        for
+          accTokOpt    ← repository.tokenDataSource.getPlatformClientAccessToken(clientId)
+          accTokList   = accTokOpt map (List(_)) getOrElse Nil
+          accessTokens ← repository.tokenScopeDataSource.getAccessTokensWithScopes(accTokList)
+        yield accessTokens.headOption
 
       private def deleteAccessTokenWithScopesCIO(
         clientId: Long,

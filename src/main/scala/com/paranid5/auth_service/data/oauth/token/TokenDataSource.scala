@@ -13,6 +13,8 @@ trait TokenDataSource[F[_] : Applicative, S]:
 
     def getClientAccessTokens(clientId: Long): F[List[TokenEntity]]
 
+    def getPlatformClientAccessToken(clientId: Long): F[Option[TokenEntity]]
+
     def getClientRefreshToken(clientId: Long): F[Option[TokenEntity]]
 
     def getToken(

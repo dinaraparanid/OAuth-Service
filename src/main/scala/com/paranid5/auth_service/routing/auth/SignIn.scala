@@ -4,7 +4,7 @@ import cats.data.Reader
 import cats.effect.IO
 
 import com.paranid5.auth_service.data.user.entity.User
-import com.paranid5.auth_service.routing.AppHttpResponse
+import com.paranid5.auth_service.routing.{AppHttpResponse, invalidBody}
 import com.paranid5.auth_service.routing.auth.entity.{SignInRequest, SignInResponse}
 
 import io.circe.syntax.*
@@ -12,9 +12,6 @@ import io.circe.syntax.*
 import org.http4s.circe.CirceEntityCodec.{circeEntityDecoder, circeEntityEncoder}
 import org.http4s.dsl.io.*
 import org.http4s.{DecodeResult, Request, Response}
-
-private def invalidBody: IO[Response[IO]] =
-  BadRequest("Invalid body")
 
 private def wrongEmail: IO[Response[IO]] =
   NotFound("User with provided email was not found")

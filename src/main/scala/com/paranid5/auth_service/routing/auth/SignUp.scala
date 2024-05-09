@@ -6,7 +6,7 @@ import cats.syntax.all.*
 
 import com.paranid5.auth_service.data.user.entity.User
 import com.paranid5.auth_service.domain.generateClientSecret
-import com.paranid5.auth_service.routing.AppHttpResponse
+import com.paranid5.auth_service.routing.{AppHttpResponse, invalidBody}
 import com.paranid5.auth_service.routing.auth.entity.{SignUpRequest, SignUpResponse}
 
 import io.circe.syntax.*
@@ -14,9 +14,6 @@ import io.circe.syntax.*
 import org.http4s.circe.CirceEntityCodec.{circeEntityDecoder, circeEntityEncoder}
 import org.http4s.{DecodeResult, Request, Response}
 import org.http4s.dsl.io.*
-
-private def invalidBody: IO[Response[IO]] =
-  BadRequest("Invalid body")
 
 private def userAlreadyRegistered: IO[Response[IO]] =
   BadRequest("User with such email is already registered")
