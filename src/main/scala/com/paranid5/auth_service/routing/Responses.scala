@@ -29,6 +29,9 @@ private def invalidToken: InvalidTokenReason ⇒ IO[Response[IO]] =
   case InvalidTokenReason.NotFound        ⇒ tokenNotFound
   case InvalidTokenReason.GenerationError ⇒ somethingWentWrong
 
+private def clientNotFound: IO[Response[IO]] =
+  NotFound("Client was not found")
+
 private def appNotFound: IO[Response[IO]] =
   NotFound("App was not found")
 

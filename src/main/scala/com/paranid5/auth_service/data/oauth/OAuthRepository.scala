@@ -88,6 +88,18 @@ trait OAuthRepository[F[_] : Applicative, R]:
       scopes:           List[TokenScope] = Nil
     ): TokenAttemptF[AccessToken]
 
+    def newPlatformAccessToken(
+      refreshToken:     RefreshToken,
+      lifeSeconds:      Option[Long]     = Option(AccessTokenAliveTime),
+      scopes:           List[TokenScope] = Nil
+    ): TokenAttemptF[AccessToken] =
+      repository.newAccessToken(
+        refreshToken     = refreshToken,
+        accessTokenTitle = "",
+        lifeSeconds      = lifeSeconds,
+        scopes           = scopes,
+      )
+
     def newRefreshToken(
       clientId:     Long,
       clientSecret: String
@@ -97,6 +109,9 @@ trait OAuthRepository[F[_] : Applicative, R]:
       clientId: Long,
       title:    String
     ): OAuthValidatedF[Unit]
+
+    def deletePlatformAccessTokenWithScopes(clientId: Long): OAuthValidatedF[Unit] =
+      repository.deleteAccessTokenWithScopes(clientId = clientId, title = "")
 
     def deleteRefreshToken(clientId: Long): TokenAttemptF[Unit]
 
