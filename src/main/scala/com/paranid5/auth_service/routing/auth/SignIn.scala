@@ -4,20 +4,14 @@ import cats.data.Reader
 import cats.effect.IO
 
 import com.paranid5.auth_service.data.user.entity.User
-import com.paranid5.auth_service.routing.{AppHttpResponse, invalidBody}
-import com.paranid5.auth_service.routing.auth.entity.{SignInRequest, SignInResponse}
+import com.paranid5.auth_service.routing.*
+import com.paranid5.auth_service.routing.auth.entity.{SignInRequest, SignInResponse, matches}
 
 import io.circe.syntax.*
 
 import org.http4s.circe.CirceEntityCodec.{circeEntityDecoder, circeEntityEncoder}
 import org.http4s.dsl.io.*
 import org.http4s.{DecodeResult, Request, Response}
-
-private def wrongEmail: IO[Response[IO]] =
-  NotFound("User with provided email was not found")
-
-private def wrongPassword: IO[Response[IO]] =
-  NotFound("User with provided email and password was not found")
 
 private def userSignedIn(
   clientId:     Long,
@@ -70,20 +64,30 @@ private def onSignIn(query: Request[IO]): AppHttpResponse =
     def retrieveUserData(request: SignInRequest): IO[Response[IO]] =
       for
         user     ← userRepository.getUserByEmail(request.email)
-        response ← processUserData(user)
+        response ← processUserData(request, user)
       yield response
 
-    def processUserData(foundUser: Option[User]): IO[Response[IO]] =
+    def processUserData(
+      request:   SignInRequest,
+      foundUser: Option[User]
+    ): IO[Response[IO]] =
       foundUser.fold(
         ifEmpty = wrongEmail)(
-        f       = retrieveCredentials
+        f       = validateUser(request, _)
       )
+
+    def validateUser(
+      request:   SignInRequest,
+      foundUser: User
+    ): IO[Response[IO]] =
+      if request matches foundUser then retrieveCredentials(foundUser)
+      else wrongPassword
 
     def retrieveCredentials(foundUser: User): IO[Response[IO]] =
       for
-        clientOpt ← oauthRepository.findClient(foundUser.userId, foundUser.encodedPassword)
+        clientOpt ← oauthRepository.getClient(foundUser.userId)
         response  ← clientOpt.fold(
-          ifEmpty = wrongPassword)(
+          ifEmpty = somethingWentWrong)(
           f       = cred ⇒ userSignedIn(cred.clientId, cred.clientSecret)
         )
       yield response

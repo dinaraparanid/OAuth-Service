@@ -7,6 +7,8 @@ import com.paranid5.auth_service.data.oauth.client.entity.{AppEntity, ClientEnti
 import com.paranid5.auth_service.data.oauth.token.entity.{AccessToken, RefreshToken, TokenScope}
 import com.paranid5.auth_service.data.oauth.token.error.*
 
+private val AccessTokenAliveTime: Long = 1000 * 60 * 5 // 5 minutes
+
 trait OAuthRepository[F[_] : Applicative, R]:
   type OAuthAttemptF  [T] = F[Either[InvalidOAuthReason, T]]
   type OAuthValidatedF[T] = F[ValidatedNec[InvalidOAuthReason, T]]
@@ -82,8 +84,8 @@ trait OAuthRepository[F[_] : Applicative, R]:
     def newAccessToken(
       refreshToken:     RefreshToken,
       accessTokenTitle: String,
-      lifeSeconds:      Option[Long],
-      scopes:           List[TokenScope]
+      lifeSeconds:      Option[Long]     = Option(AccessTokenAliveTime),
+      scopes:           List[TokenScope] = Nil
     ): TokenAttemptF[AccessToken]
 
     def newRefreshToken(
@@ -96,6 +98,6 @@ trait OAuthRepository[F[_] : Applicative, R]:
       title:    String
     ): OAuthValidatedF[Unit]
 
-    def deleteClientTokensWithScopes(
-      clientId: Long
-    ): OAuthValidatedF[Unit]
+    def deleteRefreshToken(clientId: Long): TokenAttemptF[Unit]
+
+    def deleteClientTokensWithScopes(clientId: Long): OAuthValidatedF[Unit]

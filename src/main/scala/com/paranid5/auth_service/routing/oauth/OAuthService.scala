@@ -11,17 +11,19 @@ import org.http4s.{HttpRoutes, Request, Response}
 def oauthService: AppRoutes =
   Reader: appModule ⇒
     HttpRoutes.of[IO]:
-      case query @ POST → (Root / "sign_up") // логин + пароль, вызвращает в body client_id и client_secret и редиректит
+      // TODO: По-хорошему, вместо того, чтобы сразу возвращать токены,
+      //       должен возвращать code для дальнейшего получения токена в /token
+      case query @ POST → (Root / "sign_up") // логин + пароль, вызвращает в body client_id, client_secret, оба токена и редиректит
         :? AppIdParamMatcher(appId)
         +& AppSecretParamMatcher(appSecret)
         +& RedirectUrlParamMatcher(redirectUrl) ⇒
         Ok("sign up for app")
 
-      case query @ POST → (Root / "sign_in") // логин + пароль, вызвращает в body client_id и client_secret и редиректит
+      case query @ POST → (Root / "sign_in") // логин + пароль, вызвращает в body client_id, client_secret, оба токена и редиректит
         :? AppIdParamMatcher(appId)
         +& AppSecretParamMatcher(appSecret)
         +& RedirectUrlParamMatcher(redirectUrl) ⇒
-        Ok("sign in for app")
+        onSignIn(query, appId, appSecret, redirectUrl) run appModule
 
       case query @ POST → (Root / "authorize") // принимает auth JWT токен в body, редиректит на страницу приложения авторизации
         :? ClientIdParamMatcher(clientId)

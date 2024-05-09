@@ -196,7 +196,7 @@ object PostgresOAuthRepository:
         accessTokenTitle: String,
         lifeSeconds:      Option[Long],
         scopes:           List[TokenScope]
-      ): TokenAttemptF[AccessToken] =
+      ): IO[Either[InvalidTokenReason, AccessToken]] =
         def impl(
           tokenValue: String
         ): TokenAttemptCIO[AccessToken] =
@@ -242,6 +242,11 @@ object PostgresOAuthRepository:
       ): IO[ValidatedNec[InvalidOAuthReason, Unit]] =
         repository
           .deleteAccessTokenWithScopesCIO(clientId, title)
+          .transact(repository.transactor)
+
+      override def deleteRefreshToken(clientId: Long): IO[Either[InvalidTokenReason, Unit]] =
+        repository
+          .deleteRefreshTokenCIO(clientId)
           .transact(repository.transactor)
 
       override def deleteClientTokensWithScopes(

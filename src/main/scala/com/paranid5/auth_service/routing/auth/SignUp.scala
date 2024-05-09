@@ -6,7 +6,7 @@ import cats.syntax.all.*
 
 import com.paranid5.auth_service.data.user.entity.User
 import com.paranid5.auth_service.domain.generateClientSecret
-import com.paranid5.auth_service.routing.{AppHttpResponse, invalidBody}
+import com.paranid5.auth_service.routing.*
 import com.paranid5.auth_service.routing.auth.entity.{SignUpRequest, SignUpResponse}
 
 import io.circe.syntax.*
@@ -15,17 +15,11 @@ import org.http4s.circe.CirceEntityCodec.{circeEntityDecoder, circeEntityEncoder
 import org.http4s.{DecodeResult, Request, Response}
 import org.http4s.dsl.io.*
 
-private def userAlreadyRegistered: IO[Response[IO]] =
-  BadRequest("User with such email is already registered")
-
 private def userSuccessfullyRegistered(
   clientId:     Long,
   clientSecret: String,
 ): IO[Response[IO]] =
   Created(SignUpResponse(clientId, clientSecret).asJson)
-
-private def credentialsGenerationError: IO[Response[IO]] =
-  InternalServerError("User credentials generation error. Try again")
 
 /**
  * Sign up on platform (e.g. to manage user apps).

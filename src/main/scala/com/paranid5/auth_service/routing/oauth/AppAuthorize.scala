@@ -5,36 +5,11 @@ import cats.effect.IO
 
 import com.paranid5.auth_service.data.oauth.client.entity.AppEntity
 import com.paranid5.auth_service.data.oauth.token.entity.AccessToken
-import com.paranid5.auth_service.data.oauth.token.error
-import com.paranid5.auth_service.data.oauth.token.error.InvalidTokenReason
-import com.paranid5.auth_service.routing.{AppHttpResponse, redirectToCallbackUrl}
+import com.paranid5.auth_service.routing.*
 import com.paranid5.auth_service.routing.oauth.entity.AuthorizeRequest
 
-import org.http4s.circe.CirceEntityCodec.{circeEntityDecoder, circeEntityEncoder}
-import org.http4s.dsl.io.*
+import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
 import org.http4s.{DecodeResult, Request, Response}
-
-private val DefaultRedirect = "http://0.0.0.0:4000/"
-
-private def invalidBody: IO[Response[IO]] =
-  BadRequest("Invalid body")
-
-private def appNotFound: IO[Response[IO]] =
-  NotFound("App was not found")
-
-private def tokenNotFound: IO[Response[IO]] =
-  NotFound("Token was not found")
-
-private def tokenExpired: IO[Response[IO]] =
-  Forbidden("Token has expired")
-
-private def somethingWentWrong: IO[Response[IO]] =
-  InternalServerError("Something went wrong")
-
-private def invalidToken: InvalidTokenReason ⇒ IO[Response[IO]] =
-  case InvalidTokenReason.Expired         ⇒ tokenExpired
-  case InvalidTokenReason.NotFound        ⇒ tokenNotFound
-  case InvalidTokenReason.GenerationError ⇒ somethingWentWrong
 
 /**
  * Validates access token for authorization for client app.
@@ -59,7 +34,8 @@ private def invalidToken: InvalidTokenReason ⇒ IO[Response[IO]] =
  *
  * 4. [[Forbidden]] - "Token has expired"
  *
- * 5. [[Found]] with app's callback url or with [[DefaultRedirect]]
+ * 5. [[Found]] with either provided callback url,
+ * app's callback url or with [[DefaultRedirect]]
  */
 
 private def onAppAuthorize(

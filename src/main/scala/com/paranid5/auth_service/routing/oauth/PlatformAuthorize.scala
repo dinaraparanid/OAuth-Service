@@ -5,7 +5,7 @@ import cats.effect.IO
 
 import com.paranid5.auth_service.data.oauth.token.entity.AccessToken
 import com.paranid5.auth_service.routing.oauth.entity.AuthorizeRequest
-import com.paranid5.auth_service.routing.{AppHttpResponse, redirectToCallbackUrl}
+import com.paranid5.auth_service.routing.*
 
 import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
 import org.http4s.{DecodeResult, Request, Response}
@@ -27,13 +27,12 @@ import org.http4s.{DecodeResult, Request, Response}
  * ==Response==
  * 1. [[BadRequest]] - "Invalid body"
  *
- * 2. [[NotFound]] - "App was not found"
  *
- * 3. [[NotFound]] - "Token was not found"
+ * 2. [[NotFound]] - "Token was not found"
  *
- * 4. [[Forbidden]] - "Token has expired"
+ * 3. [[Forbidden]] - "Token has expired"
  *
- * 5. [[Found]] with app's callback url or with [[DefaultRedirect]]
+ * 5. [[Found]] with provided callback url or with [[DefaultRedirect]]
  */
 
 private def onPlatformAuthorize(

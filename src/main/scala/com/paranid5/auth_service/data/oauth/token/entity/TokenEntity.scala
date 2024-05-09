@@ -1,8 +1,10 @@
 package com.paranid5.auth_service.data.oauth.token.entity
 
+import io.circe.{Decoder, Encoder}
+
 private val MillisInSecond = 1000
 
-case class TokenEntity(
+final case class TokenEntity(
   clientId:    Long,
   title:       Option[String],
   value:       String,
@@ -10,6 +12,14 @@ case class TokenEntity(
   createdAt:   Long,
   status:      String
 )
+
+object TokenEntity:
+  given Encoder[TokenEntity] =
+    Encoder.forProduct6("client_id", "title", "value", "life_seconds", "created_at", "status"): e ⇒
+      (e.clientId, e.title, e.value, e.lifeSeconds, e.createdAt, e.status)
+
+  given Decoder[TokenEntity] =
+    Decoder.forProduct6("client_id", "title", "value", "life_seconds", "created_at", "status")(TokenEntity.apply)
 
 extension (token: TokenEntity)
   def actualUntil: Option[Long] =
