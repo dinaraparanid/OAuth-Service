@@ -25,7 +25,7 @@ import org.http4s.{DecodeResult, Request, Response}
  *     "client_id":     123
  *     "app_name":      "App Title",              // non-empty string
  *     "app_thumbnail": "https://some_image.png", // optional
- *     "callback_url": "https://..."              // optional
+ *     "callback_url":  "https://..."             // optional
  *   }
  * }}}
  *

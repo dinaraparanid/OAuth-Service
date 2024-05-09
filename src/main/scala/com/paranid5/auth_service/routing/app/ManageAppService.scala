@@ -29,14 +29,6 @@ def manageAppService: AppRoutes =
         +& AppSecretParamMatcher(appSecret) ⇒
         onDelete(query) run appModule
 
-private def onFind(query: Request[IO]): AppHttpResponse =
-  Reader: appModule ⇒
-    Ok("App found")
-
-private def onUpdate(query: Request[IO]): AppHttpResponse =
-  Reader: appModule ⇒
-    Ok("App updated")
-
 private def onDelete(query: Request[IO]): AppHttpResponse =
   Reader: appModule ⇒
     Ok("App Deleted")

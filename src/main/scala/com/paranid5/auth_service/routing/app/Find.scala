@@ -37,7 +37,7 @@ import org.http4s.{DecodeResult, Request, Response}
  *     "app_secret":    "abcd",                   // 10-th length string
  *     "app_name":      "App Title",              // non-empty string
  *     "app_thumbnail": "https://some_image.png", // nullable
- *     "callback_url": "https://..."              // nullable
+ *     "callback_url":  "https://..."             // nullable
  *     "client_id":     234
  *   }
  * }}}
