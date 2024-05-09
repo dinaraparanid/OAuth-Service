@@ -11,12 +11,12 @@ import org.http4s.{HttpRoutes, Request, Response}
 def oauthService: AppRoutes =
   Reader: appModule ⇒
     HttpRoutes.of[IO]:
-      case query @ POST → (Root / "authorize") // принимает auth JWT токен в body, редиректит на страницу приложения авторизации
+      case query @ POST → (Root / "authorize")
         :? ClientIdParamMatcher(clientId)
         +& RedirectUrlParamMatcher(redirectUrl) ⇒
         onPlatformAuthorize(query, clientId, redirectUrl) run appModule
 
-      case query @ POST → (Root / "authorize") // принимает auth JWT токен в body, редиректит на страницу клиентского приложения
+      case query @ POST → (Root / "authorize")
         :? ClientIdParamMatcher(clientId)
         +& AppIdParamMatcher(appId)
         +& AppSecretParamMatcher(appSecret)
@@ -24,14 +24,14 @@ def oauthService: AppRoutes =
         onAppAuthorize(query, clientId, appId, appSecret, redirectUrl) run appModule
 
       // TODO: По-хорошему, здесь должен быть auth_code, получаемый из sign_up/sign_in
-      case POST → (Root / "token") // создает auth и refresh токены, редиректит на что-то
+      case POST → (Root / "token")
         :? ClientIdParamMatcher(clientId)
         +& ClientSecretParamMatcher(clientSecret)
         +& RedirectUrlParamMatcher(redirectUrl) ⇒
         onPlatformToken(clientId, clientSecret, redirectUrl) run appModule
 
       // TODO: По-хорошему, здесь должен быть auth_code, получаемый из sign_up/sign_in
-      case POST → (Root / "token") // создает auth и refresh токены, редиректит на что-то
+      case POST → (Root / "token")
         :? ClientIdParamMatcher(clientId)
         +& ClientSecretParamMatcher(clientSecret)
         +& AppIdParamMatcher(appId)
@@ -39,31 +39,14 @@ def oauthService: AppRoutes =
         +& RedirectUrlParamMatcher(redirectUrl) ⇒
         onAppToken(clientId, clientSecret, appId, appSecret, redirectUrl) run appModule
 
-      case query @ POST → (Root / "refresh") // принимает refresh токен в body, возвращает новый auth токен
+      case query @ POST → (Root / "refresh")
+        :? ClientIdParamMatcher(clientId)
+        +& ClientSecretParamMatcher(clientSecret) ⇒
+        onPlatformRefresh(query, clientId, clientSecret) run appModule
+
+      case query @ POST → (Root / "refresh")
         :? ClientIdParamMatcher(clientId)
         +& ClientSecretParamMatcher(clientSecret)
         +& AppIdParamMatcher(appId)
         +& AppSecretParamMatcher(appSecret) ⇒
-        onRefresh(query, clientId, clientSecret, appId, appSecret) run appModule
-
-private def onToken(
-  query:        Request[IO],
-  clientId:     Long,
-  clientSecret: String,
-  appId:        Long,
-  appSecret:    String,
-  authCode:     String,
-  redirectUrl:  Option[String]
-): AppHttpResponse =
-  Reader: appModule ⇒
-    Found(f"Tokens $redirectUrl")
-
-private def onRefresh(
-  query:        Request[IO],
-  clientId:     Long,
-  clientSecret: String,
-  appId:        Long,
-  appSecret:    String,
-): AppHttpResponse =
-  Reader: appModule ⇒
-    Ok("Refresh token")
+        onAppRefresh(query, clientId, clientSecret, appId, appSecret) run appModule

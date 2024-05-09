@@ -79,8 +79,7 @@ object PostgresOAuthRepository:
       ): IO[Either[InvalidTokenReason, Unit]] =
         def impl: ConnectionIO[Either[InvalidTokenReason, Unit]] =
           for
-            tokenOpt ← repository.tokenDataSource.getToken(clientId, tokenValue)
-            tokenRes = tokenOpt.toRight(InvalidTokenReason.NotFound)
+            tokenRes ← repository.tokenDataSource.findToken(clientId, tokenValue)
             isValid  ← tokenRes.map(repository.tokenDataSource.isTokenValid).sequence
           yield isValid.flatten
 
@@ -189,6 +188,15 @@ object PostgresOAuthRepository:
       ): IO[Option[AccessToken]] =
         repository
           .getAppAccessTokenCIO(clientId, appId, appSecret)
+          .transact(repository.transactor)
+
+      override def findToken(
+        clientId:   Long,
+        tokenValue: String
+      ): IO[Either[InvalidTokenReason, TokenEntity]] =
+        repository
+          .tokenDataSource
+          .findToken(clientId, tokenValue)
           .transact(repository.transactor)
 
       override def newAccessToken(

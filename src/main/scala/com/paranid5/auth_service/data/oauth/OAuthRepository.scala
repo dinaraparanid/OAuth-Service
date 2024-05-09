@@ -2,9 +2,8 @@ package com.paranid5.auth_service.data.oauth
 
 import cats.Applicative
 import cats.data.ValidatedNec
-
 import com.paranid5.auth_service.data.oauth.client.entity.{AppEntity, ClientEntity}
-import com.paranid5.auth_service.data.oauth.token.entity.{AccessToken, RefreshToken, TokenScope}
+import com.paranid5.auth_service.data.oauth.token.entity.{AccessToken, RefreshToken, TokenEntity, TokenScope}
 import com.paranid5.auth_service.data.oauth.token.error.*
 
 private val AccessTokenAliveTime: Long = 1000 * 60 * 5 // 5 minutes
@@ -80,6 +79,11 @@ trait OAuthRepository[F[_] : Applicative, R]:
       appId:     Long,
       appSecret: String
     ): F[Option[AccessToken]]
+
+    def findToken(
+      clientId:   Long,
+      tokenValue: String
+    ): TokenAttemptF[TokenEntity]
 
     def newAccessToken(
       refreshToken:     RefreshToken,

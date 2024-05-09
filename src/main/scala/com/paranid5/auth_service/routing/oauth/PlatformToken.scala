@@ -9,6 +9,7 @@ import com.paranid5.auth_service.data.user.entity.User
 import com.paranid5.auth_service.routing.*
 import com.paranid5.auth_service.routing.auth.entity.{SignInRequest, matches}
 import com.paranid5.auth_service.routing.oauth.entity.TokenResponse
+import com.paranid5.auth_service.routing.oauth.response.tokensGenerated
 
 import io.circe.syntax.*
 

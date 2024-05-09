@@ -8,18 +8,13 @@ import com.paranid5.auth_service.data.user.entity.User
 import com.paranid5.auth_service.domain.generateClientSecret
 import com.paranid5.auth_service.routing.*
 import com.paranid5.auth_service.routing.auth.entity.{SignUpRequest, SignUpResponse}
+import com.paranid5.auth_service.routing.auth.response.userSuccessfullyRegistered
 
 import io.circe.syntax.*
 
 import org.http4s.circe.CirceEntityCodec.{circeEntityDecoder, circeEntityEncoder}
 import org.http4s.{DecodeResult, Request, Response}
 import org.http4s.dsl.io.*
-
-private def userSuccessfullyRegistered(
-  clientId:     Long,
-  clientSecret: String,
-): IO[Response[IO]] =
-  Created(SignUpResponse(clientId, clientSecret).asJson)
 
 /**
  * Sign up on platform (e.g. to manage user apps).

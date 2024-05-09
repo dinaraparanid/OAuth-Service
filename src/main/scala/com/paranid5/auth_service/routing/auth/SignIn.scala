@@ -6,18 +6,13 @@ import cats.effect.IO
 import com.paranid5.auth_service.data.user.entity.User
 import com.paranid5.auth_service.routing.*
 import com.paranid5.auth_service.routing.auth.entity.{SignInRequest, SignInResponse, matches}
+import com.paranid5.auth_service.routing.auth.response.userSignedIn
 
 import io.circe.syntax.*
 
 import org.http4s.circe.CirceEntityCodec.{circeEntityDecoder, circeEntityEncoder}
 import org.http4s.dsl.io.*
 import org.http4s.{DecodeResult, Request, Response}
-
-private def userSignedIn(
-  clientId:     Long,
-  clientSecret: String,
-): IO[Response[IO]] =
-  Ok(SignInResponse(clientId, clientSecret).asJson)
 
 /**
  * Sign in on platform (e.g. to manage user apps).

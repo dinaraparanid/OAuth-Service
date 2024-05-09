@@ -1,4 +1,4 @@
-package com.paranid5.auth_service.routing.oauth
+package com.paranid5.auth_service.routing.oauth.response
 
 import cats.effect.IO
 
@@ -11,7 +11,7 @@ import org.http4s.circe.CirceEntityCodec.{circeEntityDecoder, circeEntityEncoder
 import org.http4s.Response
 import org.http4s.dsl.io.*
 
-private def tokensGenerated(
+def tokensGenerated(
   accessToken:  TokenEntity,
   refreshToken: TokenEntity,
   redirectUrl:  String,

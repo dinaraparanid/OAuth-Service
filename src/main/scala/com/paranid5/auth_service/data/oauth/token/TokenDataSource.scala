@@ -17,10 +17,10 @@ trait TokenDataSource[F[_] : Applicative, S]:
 
     def getClientRefreshToken(clientId: Long): F[Option[TokenEntity]]
 
-    def getToken(
+    def findToken(
       clientId:     Long,
       tokenValue:   String
-    ): F[Option[TokenEntity]]
+    ): TokenAttemptF[TokenEntity]
 
     def getTokenByTitle(
       clientId:   Long,

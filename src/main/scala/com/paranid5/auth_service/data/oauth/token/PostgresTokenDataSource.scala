@@ -3,9 +3,8 @@ package com.paranid5.auth_service.data.oauth.token
 import com.paranid5.auth_service.data.oauth.token.entity.{RefreshToken, TokenEntity, TokenStatus, isActual}
 import com.paranid5.auth_service.data.oauth.token.error.InvalidTokenReason
 import com.paranid5.auth_service.data.ops.*
-
 import cats.syntax.all.*
-
+import com.paranid5.auth_service.data.oauth.token.error.InvalidTokenReason.NotFound
 import doobie.free.connection.ConnectionIO
 import doobie.implicits.toSqlInterpolator
 import doobie.util.fragment.Fragment
@@ -52,14 +51,14 @@ object PostgresTokenDataSource:
         WHERE client_id = $clientId AND status = "refresh"
         """.option[RefreshToken]
 
-      override def getToken(
+      override def findToken(
         clientId:     Long,
         tokenValue:   String
-      ): ConnectionIO[Option[TokenEntity]] =
+      ): TokenAttemptF[TokenEntity] =
         sql"""
         SELECT * FROM "Token"
         WHERE client_id = $clientId AND value = $tokenValue
-        """.option[TokenEntity]
+        """.option[TokenEntity] map (_ toRight NotFound)
 
       override def getTokenByTitle(
         clientId:   Long,
