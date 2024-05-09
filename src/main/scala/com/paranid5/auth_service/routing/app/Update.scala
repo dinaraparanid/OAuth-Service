@@ -12,8 +12,7 @@ import org.http4s.dsl.io.*
 import org.http4s.{DecodeResult, Request, Response}
 
 /**
- * Creates new application.
- * Responds with app's credentials (id and secret)
+ * Updates application's metadata.
  *
  * ==Route==
  * PATCH /app

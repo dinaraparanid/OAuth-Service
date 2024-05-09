@@ -28,7 +28,3 @@ def manageAppService: AppRoutes =
         +& AppIdParamMatcher(appId)
         +& AppSecretParamMatcher(appSecret) ⇒
         onDelete(query) run appModule
-
-private def onDelete(query: Request[IO]): AppHttpResponse =
-  Reader: appModule ⇒
-    Ok("App Deleted")
