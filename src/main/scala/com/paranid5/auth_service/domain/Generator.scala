@@ -5,18 +5,18 @@ import cats.effect.std.SecureRandom
 
 import scala.annotation.tailrec
 
-private val TokenSize:        Int    = 45
-private val ClientSecretSize: Int    = 10
+private val TokenSize:  Int = 45
+private val SecretSize: Int = 10
 
-private val CodeChars:        String = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_.-"
-private val CodeCharsLen:     Int    = CodeChars.length
+private val CodeChars:    String = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_.-"
+private val CodeCharsLen: Int    = CodeChars.length
 
 def generateToken(tokenPrefix: String): IO[Either[Throwable, String]] =
   for token ← generateCodeImpl(TokenSize)
     yield f"$tokenPrefix${System.currentTimeMillis}$token".encodedToSha.toEither
 
-def generateClientSecret: IO[Either[Throwable, String]] =
-  for clientSecret ← generateCodeImpl(ClientSecretSize)
+def generateSecret: IO[Either[Throwable, String]] =
+  for clientSecret ← generateCodeImpl(SecretSize)
     yield f"${System.currentTimeMillis}$clientSecret".encodedToSha.toEither
 
 extension (bytes: Array[Byte])

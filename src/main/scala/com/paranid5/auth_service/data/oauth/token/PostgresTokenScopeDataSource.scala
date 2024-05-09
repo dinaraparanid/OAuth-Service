@@ -20,8 +20,8 @@ object PostgresTokenScopeDataSource:
       override def createTable(): ConnectionIO[Unit] =
         sql"""
         CREATE TABLE IF NOT EXISTS "Token_Scope" (
-          client_id INTEGER NOT NULL REFERENCES "Token"(client_id),
-          token_title TEXT NOT NULL REFERENCES "Token"(title),
+          client_id INTEGER NOT NULL REFERENCES "Token"(client_id) ON DELETE CASCADE,
+          token_title TEXT NOT NULL REFERENCES "Token"(title) ON DELETE CASCADE,
           scope TEXT NOT NULL,
           PRIMARY KEY (client_id, token_title, scope)
         )

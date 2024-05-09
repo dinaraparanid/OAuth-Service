@@ -51,13 +51,12 @@ trait OAuthRepository[F[_] : Applicative, R]:
     ): F[Option[AppEntity]]
 
     def insertApp(
-      appId:        Long,
       appSecret:    String,
       appName:      String,
       appThumbnail: Option[String],
       callbackUrl:  Option[String],
       clientId:     Long,
-    ): F[Unit]
+    ): F[Long]
 
     def deleteApp(
       clientId:  Long,

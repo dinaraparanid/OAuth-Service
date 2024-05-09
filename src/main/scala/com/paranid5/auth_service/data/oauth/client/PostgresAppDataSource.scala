@@ -16,10 +16,10 @@ object PostgresAppDataSource:
         CREATE TABLE IF NOT EXISTS "App" (
           app_id SERIAL PRIMARY KEY,
           app_secret TEXT NOT NULL UNIQUE,
-          app_name TEXT NOT NULL,
+          app_name TEXT NOT NULL CHECK (app_name <> ''),
           thumbnail TEXT,
           callback_url TEXT,
-          client_id INTEGER NOT NULL REFERENCES "Client"(client_id)
+          client_id INTEGER NOT NULL REFERENCES "Client"(client_id) ON DELETE CASCADE
         )
         """.effect
 
@@ -36,17 +36,17 @@ object PostgresAppDataSource:
         """.option[AppEntity]
 
       override def insertApp(
-        appId:        Long,
         appSecret:    String,
         appName:      String,
         appThumbnail: Option[String],
         callbackUrl:  Option[String],
         clientId:     Long,
-      ): ConnectionIO[Unit] =
+      ): ConnectionIO[Long] =
         sql"""
-        INSERT INTO "App" (app_id, app_secret, app_name, thumbnail, callback_url, client_id)
-        VALUES ($appId, $appSecret, $appName, $appThumbnail, $callbackUrl, $clientId)
-        """.effect
+        INSERT INTO "App" (app_secret, app_name, thumbnail, callback_url, client_id)
+        VALUES ($appSecret, $appName, $appThumbnail, $callbackUrl, $clientId)
+        RETURNING id
+        """.serialId
 
       override def deleteApp(appId: Long): ConnectionIO[Unit] =
         sql"""DELETE FROM "App" WHERE app_id = $appId""".effect

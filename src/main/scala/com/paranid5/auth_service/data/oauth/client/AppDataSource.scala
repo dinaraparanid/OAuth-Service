@@ -17,29 +17,12 @@ trait AppDataSource[F[_] : Applicative, S]:
     ): F[Option[AppEntity]]
 
     def insertApp(
-      appId:        Long,
       appSecret:    String,
       appName:      String,
       appThumbnail: Option[String],
       callbackUrl:  Option[String],
       clientId:     Long,
-    ): F[Unit]
-
-    def insertApp(app: AppEntity): F[Unit] =
-      source.insertApp(
-        appId        = app.appId,
-        appSecret    = app.appSecret,
-        appName      = app.appName,
-        appThumbnail = app.appThumbnail,
-        callbackUrl  = app.callbackUrl,
-        clientId     = app.clientId,
-      )
-
-    def insertApps(apps: List[AppEntity]): F[Unit] =
-      apps
-        .map(source.insertApp)
-        .sequence
-        .map(_ ⇒ ())
+    ): F[Long]
 
     def deleteApp(appId: Long): F[Unit]
 

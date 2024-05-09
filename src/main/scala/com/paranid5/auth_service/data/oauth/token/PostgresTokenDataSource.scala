@@ -21,7 +21,7 @@ object PostgresTokenDataSource:
       override def createTable(): ConnectionIO[Unit] =
         sql"""
         CREATE TABLE IF NOT EXISTS "Token" (
-          client_id INTEGER NOT NULL REFERENCES "Client"(client_id),
+          client_id INTEGER NOT NULL REFERENCES "Client"(client_id) ON DELETE CASCADE,
           title TEXT,
           value TEXT NOT NULL,
           life_seconds INTEGER,

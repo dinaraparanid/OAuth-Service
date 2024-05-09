@@ -14,7 +14,7 @@ object PostgresClientDataSource:
       override def createTable(): ConnectionIO[Unit] =
         sql"""
         CREATE TABLE IF NOT EXISTS "Client" (
-          client_id SERIAL PRIMARY KEY REFERENCES "User"(user_id),
+          client_id SERIAL PRIMARY KEY REFERENCES "User"(user_id) ON DELETE CASCADE,
           client_secret TEXT NOT NULL
         )
         """.effect

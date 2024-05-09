@@ -5,16 +5,14 @@ import cats.effect.IO
 import cats.syntax.all.*
 
 import com.paranid5.auth_service.data.user.entity.User
-import com.paranid5.auth_service.domain.generateClientSecret
+import com.paranid5.auth_service.domain.generateSecret
 import com.paranid5.auth_service.routing.*
-import com.paranid5.auth_service.routing.auth.entity.{SignUpRequest, SignUpResponse}
+import com.paranid5.auth_service.routing.auth.entity.SignUpRequest
 import com.paranid5.auth_service.routing.auth.response.userSuccessfullyRegistered
 
-import io.circe.syntax.*
-
-import org.http4s.circe.CirceEntityCodec.{circeEntityDecoder, circeEntityEncoder}
-import org.http4s.{DecodeResult, Request, Response}
+import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
 import org.http4s.dsl.io.*
+import org.http4s.{DecodeResult, Request, Response}
 
 /**
  * Sign up on platform (e.g. to manage user apps).
@@ -85,7 +83,7 @@ private def onSignUp(query: Request[IO]): AppHttpResponse =
           encodedPassword = encodedUserData.password
         )
 
-        clientSecretRes ← generateClientSecret
+        clientSecretRes ← generateSecret
         response        ← processGeneratedCredentials(clientId, clientSecretRes)
       yield response
 

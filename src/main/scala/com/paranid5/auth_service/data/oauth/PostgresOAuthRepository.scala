@@ -128,17 +128,15 @@ object PostgresOAuthRepository:
           .transact(repository.transactor)
 
       override def insertApp(
-        appId:        Long,
         appSecret:    String,
         appName:      String,
         appThumbnail: Option[String],
         callbackUrl:  Option[String],
         clientId:     Long,
-      ): IO[Unit] =
+      ): IO[Long] =
         repository
           .appDataSource
           .insertApp(
-            appId        = appId,
             appSecret    = appSecret,
             appName      = appName,
             appThumbnail = appThumbnail,
