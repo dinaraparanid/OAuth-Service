@@ -21,10 +21,6 @@ def authService: AppRoutes =
         case query @ POST → (Root / "sign_out") ⇒ // логин
           onSignOut(query) run appModule
 
-private def onSignIn(query: Request[IO]): AppHttpResponse =
-  Reader: appModule ⇒
-    Ok("Sign in")
-
 private def onSignOut(query: Request[IO]): AppHttpResponse =
   Reader: appModule ⇒
     Ok("Sign out")

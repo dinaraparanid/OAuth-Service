@@ -22,7 +22,7 @@ private def userSuccessfullyRegistered(
   clientId:     Long,
   clientSecret: String,
 ): IO[Response[IO]] =
-  Ok(SignUpResponse(clientId, clientSecret).asJson)
+  Created(SignUpResponse(clientId, clientSecret).asJson)
 
 private def credentialsGenerationError: IO[Response[IO]] =
   InternalServerError("User credentials generation error. Try again")
@@ -45,7 +45,7 @@ private def credentialsGenerationError: IO[Response[IO]] =
  *
  * 2. [[InternalServerError]] in case of insertions errors
  *
- * 3. [[Ok]] with credentials body:
+ * 3. [[Created]] with credentials body:
  * {{{
  *   {
  *     "client_id":     123,
@@ -59,7 +59,7 @@ private def onSignUp(query: Request[IO]): AppHttpResponse =
     val userRepository  = appModule.userModule.userRepository
     val oauthRepository = appModule.oauthModule.oauthRepository
 
-    def processUserCredentials(
+    def processUserData(
       foundUser:       Option[User],
       encodedUserData: SignUpRequest,
     ): IO[Response[IO]] =
@@ -76,8 +76,8 @@ private def onSignUp(query: Request[IO]): AppHttpResponse =
           encodedPassword = encodedUserData.password
         )
 
-        clientSecret ← generateClientSecret
-        response     ← processGeneratedCredentials(clientId, clientSecret)
+        clientSecretRes ← generateClientSecret
+        response        ← processGeneratedCredentials(clientId, clientSecretRes)
       yield response
 
     def processGeneratedCredentials(
@@ -103,5 +103,5 @@ private def onSignUp(query: Request[IO]): AppHttpResponse =
       request        ← query.as[SignUpRequest]
       encodedRequest = request.withEncodedPassword
       user           ← userRepository.getUserByEmail(encodedRequest.email)
-      response       ← processUserCredentials(user, encodedRequest)
+      response       ← processUserData(user, encodedRequest)
     yield response

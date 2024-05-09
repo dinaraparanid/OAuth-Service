@@ -1,12 +1,11 @@
 package com.paranid5.auth_service.data.oauth
 
-import com.paranid5.auth_service.data.IOTransactor
-import com.paranid5.auth_service.data.oauth.token.entity.{AccessToken, RefreshToken, TokenScope}
-import com.paranid5.auth_service.data.oauth.token.error.*
-import com.paranid5.auth_service.data.oauth.client.entity.AppEntity
-
 import cats.Applicative
 import cats.data.ValidatedNec
+
+import com.paranid5.auth_service.data.oauth.client.entity.{AppEntity, ClientEntity}
+import com.paranid5.auth_service.data.oauth.token.entity.{AccessToken, RefreshToken, TokenScope}
+import com.paranid5.auth_service.data.oauth.token.error.*
 
 trait OAuthRepository[F[_] : Applicative, R]:
   type OAuthAttemptF  [T] = F[Either[InvalidOAuthReason, T]]
@@ -17,10 +16,14 @@ trait OAuthRepository[F[_] : Applicative, R]:
   extension (repository: R)
     def createTables(): F[Unit]
 
-    def getClientWithTokens(
+    def getClient(clientId: Long): F[Option[ClientEntity]]
+
+    def findClient(
       clientId:     Long,
       clientSecret: String
-    ): F[Option[Client]]
+    ): F[Option[ClientEntity]]
+
+    def getClientWithTokens(clientId: Long): F[Option[Client]]
 
     def isTokenValid(
       clientId:     Long,

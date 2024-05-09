@@ -22,13 +22,18 @@ object PostgresClientDataSource:
       override def clients: ConnectionIO[List[ClientEntity]] =
         sql"""SELECT * FROM "Client"""".list[ClientEntity]
 
-      override def getClient(
+      override def getClient(clientId: Long): ConnectionIO[Option[ClientEntity]] =
+        sql"""
+        SELECT * FROM  "Client"
+        WHERE client_id = $clientId
+        """.option[ClientEntity]
+
+      override def findClient(
         clientId:     Long,
         clientSecret: String
       ): ConnectionIO[Option[ClientEntity]] =
         sql"""
-        SELECT *
-        FROM  "Client"
+        SELECT * FROM  "Client"
         WHERE client_id = $clientId AND client_secret = $clientSecret
         """.option[ClientEntity]
 
@@ -43,4 +48,3 @@ object PostgresClientDataSource:
 
       override def deleteClient(clientId: Long): ConnectionIO[Unit] =
         sql"""DELETE FROM  "Client" WHERE client_id = $clientId""".effect
-

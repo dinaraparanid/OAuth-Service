@@ -2,6 +2,7 @@ package com.paranid5.auth_service.data.oauth.client
 
 import cats.Applicative
 import cats.syntax.all.*
+
 import com.paranid5.auth_service.data.oauth.client.entity.ClientEntity
 
 trait ClientDataSource[F[_] : Applicative, S]:
@@ -10,7 +11,9 @@ trait ClientDataSource[F[_] : Applicative, S]:
 
     def clients: F[List[ClientEntity]]
 
-    def getClient(
+    def getClient(clientId: Long): F[Option[ClientEntity]]
+
+    def findClient(
       clientId:     Long,
       clientSecret: String
     ): F[Option[ClientEntity]]

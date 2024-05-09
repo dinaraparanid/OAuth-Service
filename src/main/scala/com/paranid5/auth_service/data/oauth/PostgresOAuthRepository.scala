@@ -1,22 +1,19 @@
 package com.paranid5.auth_service.data.oauth
 
+import cats.data.ValidatedNec
+import cats.effect.IO
+import cats.syntax.all.*
+
 import com.paranid5.auth_service.data.*
+import com.paranid5.auth_service.data.oauth.client.entity.{AppEntity, ClientEntity}
 import com.paranid5.auth_service.data.oauth.client.{PostgresAppDataSource, PostgresClientDataSource}
-import com.paranid5.auth_service.data.oauth.client.entity.AppEntity
 import com.paranid5.auth_service.data.oauth.token.entity.{AccessToken, RefreshToken, TokenEntity, TokenScope}
 import com.paranid5.auth_service.data.oauth.token.error.*
 import com.paranid5.auth_service.data.oauth.token.{PostgresTokenDataSource, PostgresTokenScopeDataSource}
 import com.paranid5.auth_service.domain.generateToken
 
-import cats.data.ValidatedNec
-import cats.effect.IO
-import cats.syntax.all.*
-
 import doobie.free.connection.ConnectionIO
-import doobie.util.transactor.Transactor
 import doobie.syntax.all.*
-
-import io.github.cdimascio.dotenv.Dotenv
 
 final class PostgresOAuthRepository(
   private val transactor:           IOTransactor,
@@ -51,13 +48,25 @@ object PostgresOAuthRepository:
 
         impl() transact repository.transactor
 
-      override def getClientWithTokens(
+      override def getClient(clientId: Long): IO[Option[ClientEntity]] =
+        repository
+          .clientDataSource
+          .getClient(clientId)
+          .transact(repository.transactor)
+
+      override def findClient(
         clientId:     Long,
         clientSecret: String
-      ): IO[Option[Client]] =
+      ): IO[Option[ClientEntity]] =
+        repository
+          .clientDataSource
+          .findClient(clientId, clientSecret)
+          .transact(repository.transactor)
+
+      override def getClientWithTokens(clientId: Long): IO[Option[Client]] =
         def impl: ConnectionIO[Option[Client]] =
           for
-            client       ← repository.clientDataSource.getClient(clientId, clientSecret)
+            client       ← repository.clientDataSource.getClient(clientId)
             accessTokens ← repository.getClientAccessTokensCIO(clientId)
             refreshToken ← repository.tokenDataSource.getClientRefreshToken(clientId)
           yield client map (Client(_, accessTokens, refreshToken))
@@ -237,7 +246,7 @@ object PostgresOAuthRepository:
         clientId:     Long,
         clientSecret: String
       ): ConnectionIO[Boolean] =
-        for clientOpt ← repository.clientDataSource.getClient(clientId, clientSecret)
+        for clientOpt ← repository.clientDataSource.findClient(clientId, clientSecret)
           yield clientOpt.isDefined
 
       private def getClientAccessTokensCIO(
