@@ -6,7 +6,7 @@ import com.paranid5.auth_service.data.oauth.client.entity.AppEntity
 import com.paranid5.auth_service.data.oauth.token.entity.{AccessToken, RefreshToken, TokenEntity, TokenScope}
 import com.paranid5.auth_service.data.oauth.token.error.*
 import com.paranid5.auth_service.data.oauth.token.{PostgresTokenDataSource, PostgresTokenScopeDataSource}
-import com.paranid5.auth_service.token.generateToken
+import com.paranid5.auth_service.domain.generateToken
 
 import cats.data.ValidatedNec
 import cats.effect.IO

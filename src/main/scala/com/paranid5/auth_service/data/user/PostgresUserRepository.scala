@@ -33,15 +33,20 @@ object PostgresUserRepository:
           .getUser(userId)
           .transact(repository.transactor)
 
+      override def getUserByEmail(email: String): IO[Option[User]] =
+        repository
+          .userDataSource
+          .getUserByEmail(email)
+          .transact(repository.transactor)
+
       override def storeUser(
-        userId:          Long,
         username:        String,
         email:           String,
         encodedPassword: String
-      ): IO[Unit] =
+      ): IO[Long] =
         repository
           .userDataSource
-          .storeUser(userId, username, email, encodedPassword)
+          .storeUser(username, email, encodedPassword)
           .transact(repository.transactor)
 
       override def updateUser(

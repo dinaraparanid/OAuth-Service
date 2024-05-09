@@ -16,7 +16,7 @@ object PostgresUserDataSource:
         CREATE TABLE IF NOT EXISTS "User" (
           user_id SERIAL PRIMARY KEY,
           username TEXT NOT NULL,
-          email TEXT NOT NULL,
+          email TEXT NOT NULL UNIQUE,
           password TEXT NOT NULL
         )
         """.effect
@@ -27,16 +27,19 @@ object PostgresUserDataSource:
       override def getUser(userId: Long): ConnectionIO[Option[User]] =
         sql"""SELECT * FROM "User" WHERE user_id = $userId""".option[User]
 
+      override def getUserByEmail(email: String): ConnectionIO[Option[User]] =
+        sql"""SELECT * FROM "User" WHERE email = $email""".option[User]
+
       override def storeUser(
-        userId:          Long,
         username:        String,
         email:           String,
         encodedPassword: String
-      ): ConnectionIO[Unit] =
+      ): ConnectionIO[Long] =
         sql"""
-        INSERT INTO "User" (user_id, username, email, password)
-        VALUES ($userId, $username, $email, $encodedPassword)
-        """.effect
+        INSERT INTO "User" (username, email, password)
+        VALUES ($username, $email, $encodedPassword)
+        RETURNING id
+        """.serialId
 
       override def updateUser(
         userId:             Long,

@@ -13,3 +13,6 @@ extension (query: Fragment)
 
   def effect: ConnectionIO[Unit] =
     query.update.run.map(_ ⇒ ())
+
+  def serialId: ConnectionIO[Long] =
+    query.query[Long].unique

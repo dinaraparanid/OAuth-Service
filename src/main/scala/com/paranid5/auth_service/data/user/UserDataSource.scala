@@ -12,26 +12,13 @@ trait UserDataSource[F[_] : Applicative, S]:
 
     def getUser(userId: Long): F[Option[User]]
 
+    def getUserByEmail(email: String): F[Option[User]]
+
     def storeUser(
-      userId:          Long,
       username:        String,
       email:           String,
       encodedPassword: String
-    ): F[Unit]
-
-    def storeUser(user: User): F[Unit] =
-      source.storeUser(
-        userId          = user.userId,
-        username        = user.username,
-        email           = user.email,
-        encodedPassword = user.encodedPassword
-      )
-
-    def storeUsers(users: List[User]): F[Unit] =
-      users
-        .map(source.storeUser)
-        .sequence
-        .map(_ ⇒ ())
+    ): F[Long]
 
     def updateUser(
       userId:             Long,

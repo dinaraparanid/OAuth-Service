@@ -12,12 +12,13 @@ trait UserRepository[F[_] : Applicative, R]:
 
     def getUser(userId: Long): F[Option[User]]
 
+    def getUserByEmail(email: String): F[Option[User]]
+
     def storeUser(
-      userId:          Long,
       username:        String,
       email:           String,
       encodedPassword: String
-    ): F[Unit]
+    ): F[Long]
 
     def updateUser(
       userId:             Long,
