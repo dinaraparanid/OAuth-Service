@@ -22,12 +22,12 @@ object PostgresTokenDataSource:
         sql"""
         CREATE TABLE IF NOT EXISTS "Token" (
           client_id INTEGER NOT NULL REFERENCES "Client"(client_id) ON DELETE CASCADE,
-          title TEXT,
+          app_id INTEGER REFERENCES "App"(app_id) ON DELETE CASCADE,
           value TEXT NOT NULL,
           life_seconds INTEGER,
           created_at INTEGER NOT NULL,
           status VARCHAR(10) NOT NULL,
-          PRIMARY KEY (client_id, title, value)
+          PRIMARY KEY (client_id, app_id, value)
         )
         """.effect
 
@@ -42,7 +42,7 @@ object PostgresTokenDataSource:
       ): ConnectionIO[Option[TokenEntity]] =
         sql"""
         SELECT * FROM "Token"
-        WHERE client_id = $clientId AND status = "access" AND title = ""
+        WHERE client_id = $clientId AND status = "access" AND app_id is NULL
         """.option[TokenEntity]
 
       override def getClientRefreshToken(clientId: Long): ConnectionIO[Option[RefreshToken]] =
@@ -60,25 +60,25 @@ object PostgresTokenDataSource:
         WHERE client_id = $clientId AND value = $tokenValue
         """.option[TokenEntity] map (_ toRight NotFound)
 
-      override def getTokenByTitle(
-        clientId:   Long,
-        tokenTitle: String
+      override def getTokenByAppId(
+        clientId: Long,
+        appId:    Long
       ): ConnectionIO[Option[TokenEntity]] =
         sql"""
         SELECT * FROM "Token"
-        WHERE client_id = $clientId AND title = $tokenTitle
+        WHERE client_id = $clientId AND app_id = $appId
         """.option[TokenEntity]
 
-      override def newAccessToken(
+      override def newAppAccessToken(
         refreshToken: RefreshToken,
-        title:        String,
+        appId:        Long,
         lifeSeconds:  Option[Long],
         tokenValue:   String,
       ): TokenAttemptF[TokenEntity] =
         def impl(tokenValue: String): TokenAttemptF[TokenEntity] =
           newToken(
             clientId    = refreshToken.clientId,
-            title       = Option(title),
+            appId       = Option(appId),
             value       = tokenValue,
             lifeSeconds = lifeSeconds,
             createdAt   = System.currentTimeMillis,
@@ -97,7 +97,7 @@ object PostgresTokenDataSource:
       ): TokenAttemptF[RefreshToken] =
         newToken(
           clientId    = clientId,
-          title       = None,
+          appId       = None,
           value       = tokenValue,
           lifeSeconds = Option(RefreshTokenAliveTime),
           createdAt   = System.currentTimeMillis,
@@ -105,8 +105,8 @@ object PostgresTokenDataSource:
         )
 
       override def isTokenValid(token: TokenEntity): ConnectionIO[Either[InvalidTokenReason, Unit]] =
-        val TokenEntity(clientId, title, value, lifeSeconds, createdAt, status) = token
-        for foundTokenOpt ← getToken(clientId = clientId, title = title, value = value)
+        val TokenEntity(clientId, appId, value, lifeSeconds, createdAt, status) = token
+        for foundTokenOpt ← getToken(clientId = clientId, appId = appId, value = value)
           yield foundTokenOpt
             .toRight(InvalidTokenReason.NotFound)
             .flatMap: token ⇒
@@ -115,36 +115,36 @@ object PostgresTokenDataSource:
 
       override def getToken(
         clientId: Long,
-        title:    Option[String],
+        appId:    Option[Long],
         value:    String
       ): ConnectionIO[Option[TokenEntity]] =
         sql"""
         SELECT * FROM "Token"
-        WHERE client_id = $clientId AND title = $title AND value = $value
+        WHERE client_id = $clientId AND app_id = $appId AND value = $value
         """.option[TokenEntity]
 
       override def deleteToken(
         clientId: Long,
-        title:    Option[String]
+        appId:    Option[Long]
       ): TokenAttemptF[Unit] =
         sql"""
         DELETE FROM "Token"
-        WHERE client_id = $clientId AND title = $title
+        WHERE client_id = $clientId AND app_id = $appId
         """.attemptDelete
 
       private def newToken(
         clientId:    Long,
-        title:       Option[String],
+        appId:       Option[Long],
         value:       String,
         lifeSeconds: Option[Long],
         createdAt:   Long,
         status:      String
       ): TokenAttemptF[TokenEntity] =
         sql"""
-        INSERT INTO "Token" (client_id, title, value, life_seconds, created_at, status)
-        VALUES ($clientId, $title, $value, $lifeSeconds, $createdAt, $status)
+        INSERT INTO "Token" (client_id, app_id, value, life_seconds, created_at, status)
+        VALUES ($clientId, $appId, $value, $lifeSeconds, $createdAt, $status)
         """.attemptInsert:
-          TokenEntity(clientId, title, value, lifeSeconds, createdAt, status)
+          TokenEntity(clientId, appId, value, lifeSeconds, createdAt, status)
 
   extension (query: Fragment)
     private def attemptInsert(

@@ -14,14 +14,14 @@ trait TokenScopeDataSource[F[_] : Applicative, S]:
 
     def getTokenScopes(
       clientId:         Long,
-      accessTokenTitle: String,
+      accessTokenAppId: Long,
     ): F[List[TokenScopeRelation]]
 
     def getAccessTokensWithScopes(
       accessTokens: List[TokenEntity]
     ): F[List[AccessToken]] =
       def buildAccessToken(token: TokenEntity): F[AccessToken] =
-        for tokScopesRel ← source.getTokenScopes(token.clientId, token.title getOrElse "")
+        for tokScopesRel ← source.getTokenScopes(token.clientId, token.appId getOrElse -1)
           yield AccessToken(
             entity = token,
             scopes = tokScopesRel map (r ⇒ TokenScope(r.scope))
@@ -31,26 +31,26 @@ trait TokenScopeDataSource[F[_] : Applicative, S]:
 
     def addScopeToToken(
       clientId:         Long,
-      accessTokenTitle: String,
+      accessTokenAppId: Long,
       scope:            String
     ): F[Either[InvalidScopeReason, Unit]]
 
     def addScopesToToken(
       clientId:         Long,
-      accessTokenTitle: String,
+      accessTokenAppId: Long,
       scopes:           List[TokenScope]
     ): F[List[Either[InvalidScopeReason, Unit]]] =
       scopes
-        .map(s ⇒ source.addScopeToToken(clientId, accessTokenTitle, s.value))
+        .map(s ⇒ source.addScopeToToken(clientId, accessTokenAppId, s.value))
         .sequence
 
     def removeScopeFromToken(
       clientId:         Long,
-      accessTokenTitle: String,
+      accessTokenAppId: Long,
       scope:            String
     ): TokenScopeAttemptF[Unit]
 
     def removeAllScopesFromToken(
       clientId:         Long,
-      accessTokenTitle: String,
+      accessTokenAppId: Option[Long],
     ): TokenScopeAttemptF[Unit]

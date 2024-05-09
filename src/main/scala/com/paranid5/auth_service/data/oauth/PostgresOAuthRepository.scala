@@ -197,9 +197,9 @@ object PostgresOAuthRepository:
           .findToken(clientId, tokenValue)
           .transact(repository.transactor)
 
-      override def newAccessToken(
+      override def newAppAccessToken(
         refreshToken:     RefreshToken,
-        accessTokenTitle: String,
+        accessTokenAppId: Long,
         lifeSeconds:      Option[Long],
         scopes:           List[TokenScope]
       ): IO[Either[InvalidTokenReason, AccessToken]] =
@@ -207,22 +207,22 @@ object PostgresOAuthRepository:
           tokenValue: String
         ): TokenAttemptCIO[AccessToken] =
           for
-            token ← repository.tokenDataSource.newAccessToken(
+            token ← repository.tokenDataSource.newAppAccessToken(
               refreshToken = refreshToken,
-              title        = accessTokenTitle,
+              appId        = accessTokenAppId,
               lifeSeconds  = lifeSeconds,
               tokenValue   = tokenValue
             )
 
             _ ← repository.tokenScopeDataSource.addScopesToToken(
               clientId         = refreshToken.clientId,
-              accessTokenTitle = accessTokenTitle,
+              accessTokenAppId = accessTokenAppId,
               scopes           = scopes
             )
           yield token map (t ⇒ AccessToken(entity = t, scopes = scopes))
 
         for
-          tokenValueRes ← generateToken(tokenPrefix = accessTokenTitle)
+          tokenValueRes ← generateToken(tokenPrefix = f"$accessTokenAppId")
           token         ← transactToken(tokenValueRes)(impl)
         yield token
 
@@ -244,10 +244,10 @@ object PostgresOAuthRepository:
 
       override def deleteAccessTokenWithScopes(
         clientId: Long,
-        title:    String
+        appId:    Option[Long],
       ): IO[ValidatedNec[InvalidOAuthReason, Unit]] =
         repository
-          .deleteAccessTokenWithScopesCIO(clientId, title)
+          .deleteAccessTokenWithScopesCIO(clientId, appId)
           .transact(repository.transactor)
 
       override def deleteRefreshToken(clientId: Long): IO[Either[InvalidTokenReason, Unit]] =
@@ -282,16 +282,10 @@ object PostgresOAuthRepository:
         appId:     Long,
         appSecret: String,
       ): ConnectionIO[Option[AccessToken]] =
-        def retrieveAppToken(
-          clientApp: Option[AppEntity]
-        ): ConnectionIO[Option[TokenEntity]] =
-          clientApp
-            .map: app ⇒
-              repository
-                .tokenDataSource
-                .getTokenByTitle(clientId, app.appName)
-            .sequence
-            .map(_.flatten)
+        def retrieveAppToken: ConnectionIO[Option[TokenEntity]] =
+          repository
+            .tokenDataSource
+            .getTokenByAppId(clientId, appId)
 
         def retrieveTokenWithScope(
           appToken: Option[TokenEntity]
@@ -306,8 +300,7 @@ object PostgresOAuthRepository:
             .map(_.flatten)
 
         for
-          app         ← repository.appDataSource.getApp(appId, appSecret)
-          token       ← retrieveAppToken(app)
+          token       ← retrieveAppToken
           accessToken ← retrieveTokenWithScope(token)
         yield accessToken
 
@@ -322,18 +315,18 @@ object PostgresOAuthRepository:
 
       private def deleteAccessTokenWithScopesCIO(
         clientId: Long,
-        title:    String,
+        appId:    Option[Long],
       ): ConnectionIO[ValidatedNec[InvalidOAuthReason, Unit]] =
         def removeScopes(): TokenScopeAttemptCIO[Unit] =
           repository
             .tokenScopeDataSource
             .removeAllScopesFromToken(
               clientId         = clientId,
-              accessTokenTitle = title
+              accessTokenAppId = appId
             )
 
         def removeToken(): TokenAttemptCIO[Unit] =
-          repository.tokenDataSource.deleteToken(clientId, Option(title))
+          repository.tokenDataSource.deleteToken(clientId, appId)
 
         for
           rmScopesRes ← removeScopes()
@@ -371,7 +364,7 @@ object PostgresOAuthRepository:
             .map: tok ⇒
               repository.deleteAccessTokenWithScopesCIO(
                 clientId = clientId,
-                title    = tok.entity.title getOrElse ""
+                appId    = tok.entity.appId
               )
             .sequence
         yield removeVal.sequence map (_ ⇒ ())

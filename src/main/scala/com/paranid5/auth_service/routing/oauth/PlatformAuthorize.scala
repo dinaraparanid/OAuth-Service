@@ -8,6 +8,7 @@ import com.paranid5.auth_service.routing.oauth.entity.AuthorizeRequest
 import com.paranid5.auth_service.routing.*
 
 import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
+import org.http4s.dsl.io.*
 import org.http4s.{DecodeResult, Request, Response}
 
 /**

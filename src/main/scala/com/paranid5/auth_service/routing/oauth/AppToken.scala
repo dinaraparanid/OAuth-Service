@@ -36,7 +36,7 @@ import org.http4s.{DecodeResult, Request, Response}
  *   {
  *     "access_token":  {
  *       "client_id":    123,
- *       "title":        "App Title",
+ *       "app_id":       234,
  *       "value":        "abcdef", // 45-th length string
  *       "life_seconds": 100,
  *       "created_at":   100,      // time since January 1, 1970 UTC
@@ -44,7 +44,7 @@ import org.http4s.{DecodeResult, Request, Response}
  *     },
  *     "refresh_token":  {
  *       "client_id":    123,
- *       "title":        null,     // always null
+ *       "app_id":       null,     // always null
  *       "value":        "abcdef", // 45-th length string
  *       "life_seconds": 100,
  *       "created_at":   100,      // time since January 1, 1970 UTC
@@ -93,7 +93,7 @@ private def onAppToken(
 
         _ ← oauthRepository.deleteAccessTokenWithScopes(
           clientId = client.clientId,
-          title    = app.appName
+          appId    = Option(appId)
         )
 
         response ← generateRefreshToken(client, app)
@@ -123,9 +123,9 @@ private def onAppToken(
       val redirect = redirectUrl getOrElse (app.callbackUrl getOrElse DefaultRedirect)
 
       for
-        accessTokenRes ← oauthRepository.newAccessToken(
+        accessTokenRes ← oauthRepository.newAppAccessToken(
           refreshToken     = refreshToken,
-          accessTokenTitle = app.appName,
+          accessTokenAppId = appId,
         )
 
         response ← accessTokenRes.fold(

@@ -41,7 +41,7 @@ import org.http4s.{DecodeResult, Request, Response}
  *   {
  *     "access_token":  {
  *       "client_id":    123,
- *       "title":        "App Title",
+ *       "app_id":       234,
  *       "value":        "abcdef", // 45-th length string
  *       "life_seconds": 100,
  *       "created_at":   100,      // time since January 1, 1970 UTC
@@ -100,16 +100,16 @@ private def onAppRefresh(
         appOpt   ← oauthRepository.getApp(appId, appSecret)
         response ← appOpt.fold(
           ifEmpty = appNotFound)(
-          f       = app ⇒ generateAccessToken(refreshToken, app.appName)
+          f       = _ ⇒ generateAccessToken(refreshToken, appId)
         )
       yield response
 
     def generateAccessToken(
       refreshToken: TokenEntity,
-      appName:      String
+      appId:        Long,
     ): IO[Response[IO]] =
       for
-        accessTokenRes ← oauthRepository.newAccessToken(refreshToken, appName)
+        accessTokenRes ← oauthRepository.newAppAccessToken(refreshToken, appId)
         response ← accessTokenRes.fold(
           fa = _ ⇒ somethingWentWrong,
           fb = t ⇒ accessTokenRefreshed(t.entity)

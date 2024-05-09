@@ -22,14 +22,14 @@ trait TokenDataSource[F[_] : Applicative, S]:
       tokenValue:   String
     ): TokenAttemptF[TokenEntity]
 
-    def getTokenByTitle(
+    def getTokenByAppId(
       clientId:   Long,
-      tokenTitle: String
+      appId: Long
     ): F[Option[TokenEntity]]
 
-    def newAccessToken(
+    def newAppAccessToken(
       refreshToken: RefreshToken,
-      title:        String,
+      appId:        Long,
       lifeSeconds:  Option[Long],
       tokenValue:   String,
     ): TokenAttemptF[TokenEntity]
@@ -44,11 +44,11 @@ trait TokenDataSource[F[_] : Applicative, S]:
 
     def getToken(
       clientId: Long,
-      title:    Option[String],
+      appId:    Option[Long],
       value:    String
     ): F[Option[TokenEntity]]
 
     def deleteToken(
       clientId: Long,
-      title:    Option[String]
+      appId:    Option[Long]
     ): TokenAttemptF[Unit]

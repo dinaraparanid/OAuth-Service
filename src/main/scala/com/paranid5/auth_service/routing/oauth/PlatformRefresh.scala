@@ -39,7 +39,7 @@ import org.http4s.{DecodeResult, Request, Response}
  *   {
  *     "access_token":  {
  *       "client_id":    123,
- *       "title":        "",       // always empty
+ *       "app_id":       null,     // always null
  *       "value":        "abcdef", // 45-th length string
  *       "life_seconds": 100,
  *       "created_at":   100,      // time since January 1, 1970 UTC
