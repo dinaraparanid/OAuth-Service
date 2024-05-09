@@ -6,6 +6,7 @@ import cats.effect.{ExitCode, IO, IOApp}
 import com.comcast.ip4s.{ipv4, port}
 
 import com.paranid5.auth_service.di.{AppDependencies, AppModule}
+import com.paranid5.auth_service.routing.app.manageAppService
 import com.paranid5.auth_service.routing.auth.authService
 import com.paranid5.auth_service.routing.oauth.oauthService
 
@@ -31,6 +32,11 @@ object App extends IOApp:
 
   private def appService: AppDependencies[Kleisli[IO, Request[IO], Response[IO]]] =
     for
-      auth  ← authService
-      oauth ← oauthService
-    yield Router("/auth" -> auth, "/oauth" -> oauth).orNotFound
+      auth      ← authService
+      oauth     ← oauthService
+      manageApp ← manageAppService
+    yield Router(
+      "/auth"  -> auth,
+      "/oauth" -> oauth,
+      "/app"   -> manageApp
+    ).orNotFound

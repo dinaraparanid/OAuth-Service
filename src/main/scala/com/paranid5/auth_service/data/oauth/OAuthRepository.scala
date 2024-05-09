@@ -27,9 +27,8 @@ trait OAuthRepository[F[_] : Applicative, R]:
 
     def isTokenValid(
       clientId:     Long,
-      clientSecret: String,
       tokenValue:   String
-    ): F[Boolean]
+    ): F[Either[InvalidTokenReason, Unit]]
 
     def isClientExits(
       clientId:     Long,
@@ -73,6 +72,12 @@ trait OAuthRepository[F[_] : Applicative, R]:
     ): F[Unit]
 
     def getClientAccessTokens(clientId: Long): F[List[AccessToken]]
+
+    def getAppAccessToken(
+      clientId:  Long,
+      appId:     Long,
+      appSecret: String
+    ): F[Option[AccessToken]]
 
     def newAccessToken(
       refreshToken:     RefreshToken,

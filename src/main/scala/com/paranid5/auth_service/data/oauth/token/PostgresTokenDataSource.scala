@@ -97,7 +97,7 @@ object PostgresTokenDataSource:
           status      = TokenStatus.Refresh.title
         )
 
-      override def isTokenValid(token: TokenEntity): TokenAttemptF[Unit] =
+      override def isTokenValid(token: TokenEntity): ConnectionIO[Either[InvalidTokenReason, Unit]] =
         val TokenEntity(clientId, title, value, lifeSeconds, createdAt, status) = token
         for foundTokenOpt ← getToken(clientId = clientId, title = title, value = value)
           yield foundTokenOpt

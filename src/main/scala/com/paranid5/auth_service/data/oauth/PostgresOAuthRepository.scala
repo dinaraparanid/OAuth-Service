@@ -75,14 +75,14 @@ object PostgresOAuthRepository:
 
       override def isTokenValid(
         clientId:     Long,
-        clientSecret: String,
         tokenValue:   String
-      ): IO[Boolean] =
-        def impl: ConnectionIO[Boolean] =
+      ): IO[Either[InvalidTokenReason, Unit]] =
+        def impl: ConnectionIO[Either[InvalidTokenReason, Unit]] =
           for
-            clientExists ← repository.isClientExistsCIO(clientId, clientSecret)
-            tokenOpt     ← repository.tokenDataSource.getToken(clientId, tokenValue)
-          yield clientExists && tokenOpt.isDefined
+            tokenOpt ← repository.tokenDataSource.getToken(clientId, tokenValue)
+            tokenRes = tokenOpt.toRight(InvalidTokenReason.NotFound)
+            isValid  ← tokenRes.map(repository.tokenDataSource.isTokenValid).sequence
+          yield isValid.flatten
 
         impl transact repository.transactor
 
@@ -180,6 +180,15 @@ object PostgresOAuthRepository:
       override def getClientAccessTokens(clientId: Long): IO[List[AccessToken]] =
         repository
           .getClientAccessTokensCIO(clientId)
+          .transact(repository.transactor)
+
+      override def getAppAccessToken(
+        clientId:  Long,
+        appId:     Long,
+        appSecret: String
+      ): IO[Option[AccessToken]] =
+        repository
+          .getAppAccessTokenCIO(clientId, appId, appSecret)
           .transact(repository.transactor)
 
       override def newAccessToken(

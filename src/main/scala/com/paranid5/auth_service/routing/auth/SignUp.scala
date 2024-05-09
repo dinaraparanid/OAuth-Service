@@ -11,9 +11,12 @@ import com.paranid5.auth_service.routing.auth.entity.{SignUpRequest, SignUpRespo
 
 import io.circe.syntax.*
 
-import org.http4s.circe.CirceEntityCodec.{circeEntityEncoder, circeEntityDecoder}
-import org.http4s.{Request, Response}
+import org.http4s.circe.CirceEntityCodec.{circeEntityDecoder, circeEntityEncoder}
+import org.http4s.{DecodeResult, Request, Response}
 import org.http4s.dsl.io.*
+
+private def invalidBody: IO[Response[IO]] =
+  BadRequest("Invalid body")
 
 private def userAlreadyRegistered: IO[Response[IO]] =
   BadRequest("User with such email is already registered")
@@ -28,8 +31,12 @@ private def credentialsGenerationError: IO[Response[IO]] =
   InternalServerError("User credentials generation error. Try again")
 
 /**
+ * Sign up on platform (e.g. to manage user apps).
  * Adds new user and client to the database,
  * if it was not already registered.
+ *
+ * ==Route==
+ * POST /auth/sign_up
  *
  * ==Body==
  * {{{
@@ -41,11 +48,13 @@ private def credentialsGenerationError: IO[Response[IO]] =
  * }}}
  *
  * ==Response==
- * 1. [[BadRequest]] if user was previously registered
+ * 1. [[BadRequest]] - "Invalid body"
  *
- * 2. [[InternalServerError]] in case of insertions errors
+ * 2. [[BadRequest]] if user was previously registered
  *
- * 3. [[Created]] with credentials body:
+ * 3. [[InternalServerError]] in case of insertions errors
+ *
+ * 4. [[Created]] with credentials body:
  * {{{
  *   {
  *     "client_id":     123,
@@ -58,6 +67,20 @@ private def onSignUp(query: Request[IO]): AppHttpResponse =
   Reader: appModule ⇒
     val userRepository  = appModule.userModule.userRepository
     val oauthRepository = appModule.oauthModule.oauthRepository
+
+    def processRequest(requestRes: DecodeResult[IO, SignUpRequest]): IO[Response[IO]] =
+      for
+        responseIO ← requestRes.fold(_ ⇒ invalidBody, retrieveUserData)
+        response   ← responseIO
+      yield response
+
+    def retrieveUserData(request: SignUpRequest): IO[Response[IO]] =
+      val encodedRequest = request.withEncodedPassword
+
+      for
+        user     ← userRepository.getUserByEmail(encodedRequest.email)
+        response ← processUserData(user, encodedRequest)
+      yield response
 
     def processUserData(
       foundUser:       Option[User],
@@ -99,9 +122,4 @@ private def onSignUp(query: Request[IO]): AppHttpResponse =
         )
       yield response
 
-    for
-      request        ← query.as[SignUpRequest]
-      encodedRequest = request.withEncodedPassword
-      user           ← userRepository.getUserByEmail(encodedRequest.email)
-      response       ← processUserData(user, encodedRequest)
-    yield response
+    processRequest(query.attemptAs[SignUpRequest])
