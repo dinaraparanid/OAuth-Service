@@ -195,6 +195,14 @@ object PostgresOAuthRepository:
           .findToken(clientId, tokenValue)
           .transact(repository.transactor)
 
+      override def retrieveToken(
+        tokenValue: String
+      ): IO[Either[InvalidTokenReason, TokenEntity]] =
+        repository
+          .tokenDataSource
+          .retrieveToken(tokenValue)
+          .transact(repository.transactor)
+
       override def newAppAccessToken(
         refreshToken:     RefreshToken,
         accessTokenAppId: Long,

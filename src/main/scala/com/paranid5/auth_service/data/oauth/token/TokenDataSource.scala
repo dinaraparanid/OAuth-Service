@@ -22,6 +22,8 @@ trait TokenDataSource[F[_] : Applicative, S]:
       tokenValue:   String
     ): TokenAttemptF[TokenEntity]
 
+    def retrieveToken(tokenValue: String): TokenAttemptF[TokenEntity]
+
     def getTokenByAppId(
       clientId:   Long,
       appId: Long

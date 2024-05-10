@@ -61,6 +61,12 @@ object PostgresTokenDataSource:
         WHERE client_id = $clientId AND value = $tokenValue
         """.option[TokenEntity] map (_ toRight NotFound)
 
+      override def retrieveToken(tokenValue: String): TokenAttemptF[TokenEntity] =
+        sql"""
+        SELECT * FROM "Token"
+        WHERE value = $tokenValue
+        """.option[TokenEntity] map (_ toRight NotFound)
+
       override def getTokenByAppId(
         clientId: Long,
         appId:    Long

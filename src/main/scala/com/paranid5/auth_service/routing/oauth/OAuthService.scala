@@ -52,3 +52,7 @@ def oauthService: AppRoutes =
           +& AppIdParamMatcher(appId)
           +& AppSecretParamMatcher(appSecret) ⇒
           onAppRefresh(query, clientId, clientSecret, appId, appSecret) run appModule
+
+        case GET → (Root / "user") :? AccessTokenParamMatcher(accessToken) ⇒
+          onFindUser(accessToken) run appModule
+

@@ -10,3 +10,4 @@ private object AppNameParamMatcher      extends QueryParamDecoderMatcher[String]
 private object AppThumbnailParamMatcher extends OptionalQueryParamDecoderMatcher[String]("app_thumbnail")
 private object RedirectUrlParamMatcher  extends OptionalQueryParamDecoderMatcher[String]("redirect_url")
 private object AuthCodeParamMatcher     extends QueryParamDecoderMatcher[String]("auth_code")
+private object AccessTokenParamMatcher  extends QueryParamDecoderMatcher[String]("access_token")

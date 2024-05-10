@@ -84,6 +84,8 @@ trait OAuthRepository[F[_] : Applicative, R]:
       tokenValue: String
     ): TokenAttemptF[TokenEntity]
 
+    def retrieveToken(tokenValue: String): TokenAttemptF[TokenEntity]
+
     def newAppAccessToken(
       refreshToken:     RefreshToken,
       accessTokenAppId: Long,
