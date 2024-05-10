@@ -30,11 +30,11 @@ import org.http4s.{DecodeResult, Request, Response}
  *
  * 2. [[NotFound]] - "App was not found"
  *
- * 3. [[Created]] with created app's credentials:
+ * 3. [[Ok]] with requested app's credentials:
  * {{{
  *   {
  *     "app_id":        123,
- *     "app_secret":    "abcd",                   // 10-th length string
+ *     "app_secret":    "abcd",
  *     "app_name":      "App Title",              // non-empty string
  *     "app_thumbnail": "https://some_image.png", // nullable
  *     "callback_url":  "https://..."             // nullable
