@@ -1,10 +1,10 @@
-package com.paranid5.authback
-
-import com.paranid5.authback.token.generateToken
+package com.paranid5.auth_service
 
 import cats.syntax.all.*
 import cats.effect.*
 import cats.effect.testing.scalatest.AsyncIOSpec
+
+import com.paranid5.auth_service.domain.generateToken
 
 import org.scalatest.freespec.AsyncFreeSpec
 import org.scalatest.matchers.should.Matchers
