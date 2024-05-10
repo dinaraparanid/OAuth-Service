@@ -10,6 +10,6 @@ import org.http4s.{HttpRoutes, Request, Response}
 
 def authService: AppRoutes =
   Reader: appModule ⇒
-    HttpRoutes.of[IO]:
+    HttpRoutes.of[IO]: // TODO: проверка email-а + восстановление пароля
       case query @ POST → (Root / "sign_up") ⇒ onSignUp(query) run appModule
       case query @ POST → (Root / "sign_in") ⇒ onSignIn(query) run appModule

@@ -21,7 +21,7 @@ import org.http4s.{DecodeResult, Request, Response}
  * {{{
  *   {
  *     "app_id":        123
- *     "app_secret":    "abcd"                    // 10-th length string
+ *     "app_secret":    "abcd"
  *     "app_name":      "App Title",              // non-empty string
  *     "app_thumbnail": "https://some_image.png", // optional
  *     "callback_url":  "https://...",             // optional
@@ -33,7 +33,9 @@ import org.http4s.{DecodeResult, Request, Response}
  *
  * 2. [[NotFound]] - "App was not found"
  *
- * 3. [[Ok]] - "App successfully updated"
+ * 3. [[BadRequest]] - "App name must not be empty"
+ *
+ * 4. [[Ok]] - "App successfully updated"
  */
 
 private def onUpdate(query: Request[IO]): AppHttpResponse =
@@ -49,7 +51,11 @@ private def onUpdate(query: Request[IO]): AppHttpResponse =
     def validateRequest(request: UpdateRequest): IO[Response[IO]] =
       for
         oldAppOpt ← oauthRepository.getApp(request.appId, request.appSecret)
-        response  ← oldAppOpt.fold(ifEmpty = appNotFound)(f = _ ⇒ updateApp(request))
+        response  ← oldAppOpt.fold(
+          ifEmpty = appNotFound)(
+          f       = _ ⇒ if request.appName.isEmpty then appNameMustNotBeEmpty
+                        else updateApp(request)
+        )
       yield response
 
     def updateApp(request: UpdateRequest): IO[Response[IO]] =

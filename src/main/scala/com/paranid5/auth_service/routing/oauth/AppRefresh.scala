@@ -18,12 +18,12 @@ import org.http4s.{DecodeResult, Request, Response}
  * Redirects either to provided callback url or the [[DefaultRedirect]]
  *
  * ==Route==
- * POST /oauth/authorize?client_id=123&redirect_url=https://...
+ * POST /oauth/refresh?client_id=123&client_secret=secret&app_id=234&app_secret=secret&redirect_url=https://...
  *
  * ==Body==
  * {{{
  *   {
- *     "token": "abcdef" // 45-th length string
+ *     "token": "abcdef"
  *   }
  * }}}
  *
@@ -43,7 +43,7 @@ import org.http4s.{DecodeResult, Request, Response}
  *       "token_id":     1,
  *       "client_id":    123,
  *       "app_id":       234,
- *       "value":        "abcdef", // 45-th length string
+ *       "value":        "abcdef",
  *       "life_seconds": 100,
  *       "created_at":   100,      // time since January 1, 1970 UTC
  *       "status":       "access"

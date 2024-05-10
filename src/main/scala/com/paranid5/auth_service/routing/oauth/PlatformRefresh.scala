@@ -18,12 +18,12 @@ import org.http4s.{DecodeResult, Request, Response}
  * Redirects either to provided callback url or the [[DefaultRedirect]]
  *
  * ==Route==
- * POST /oauth/authorize?client_id=123&redirect_url=https://...
+ * POST /oauth/refresh?client_id=123&client_secret=secret
  *
  * ==Body==
  * {{{
  *   {
- *     "token": "abcdef" // 45-th length string
+ *     "token": "abcdef"
  *   }
  * }}}
  *
