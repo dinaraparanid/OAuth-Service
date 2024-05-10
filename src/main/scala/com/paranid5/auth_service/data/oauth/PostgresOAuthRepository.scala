@@ -3,15 +3,13 @@ package com.paranid5.auth_service.data.oauth
 import cats.data.ValidatedNec
 import cats.effect.IO
 import cats.syntax.all.*
-
 import com.paranid5.auth_service.data.*
 import com.paranid5.auth_service.data.oauth.client.entity.{AppEntity, ClientEntity}
 import com.paranid5.auth_service.data.oauth.client.{PostgresAppDataSource, PostgresClientDataSource}
-import com.paranid5.auth_service.data.oauth.token.entity.{AccessToken, RefreshToken, TokenEntity, TokenScope}
+import com.paranid5.auth_service.data.oauth.token.entity.{AccessToken, RefreshToken, TokenEntity, TokenScope, TokenStatus}
 import com.paranid5.auth_service.data.oauth.token.error.*
 import com.paranid5.auth_service.data.oauth.token.{PostgresTokenDataSource, PostgresTokenScopeDataSource}
 import com.paranid5.auth_service.domain.generateToken
-
 import doobie.free.connection.ConnectionIO
 import doobie.syntax.all.*
 
@@ -216,7 +214,7 @@ object PostgresOAuthRepository:
 
             _ ← repository.tokenScopeDataSource.addScopesToToken(
               clientId         = refreshToken.clientId,
-              accessTokenAppId = accessTokenAppId,
+              accessTokenAppId = Option(accessTokenAppId),
               scopes           = scopes
             )
           yield token map (t ⇒ AccessToken(entity = t, scopes = scopes))
@@ -224,6 +222,33 @@ object PostgresOAuthRepository:
         for
           tokenValueRes ← generateToken(tokenPrefix = f"$accessTokenAppId")
           token         ← transactToken(tokenValueRes)(impl)
+        yield token
+
+      override def newPlatformAccessToken(
+        refreshToken:     RefreshToken,
+        lifeSeconds:      Option[Long]     = Option(AccessTokenAliveTime),
+        scopes:           List[TokenScope] = Nil
+      ): TokenAttemptF[AccessToken] =
+        def impl(
+          tokenValue: String
+        ): TokenAttemptCIO[AccessToken] =
+          for
+            token ← repository.tokenDataSource.newPlatformAccessToken(
+              refreshToken = refreshToken,
+              lifeSeconds  = lifeSeconds,
+              tokenValue   = tokenValue
+            )
+
+            _ ← repository.tokenScopeDataSource.addScopesToToken(
+              clientId         = refreshToken.clientId,
+              accessTokenAppId = None,
+              scopes           = scopes
+            )
+          yield token map (t ⇒ AccessToken(entity = t, scopes = scopes))
+
+        for
+          tokenValueRes ← generateToken(tokenPrefix = f"${refreshToken.createdAt}")
+          token ← transactToken(tokenValueRes)(impl)
         yield token
 
       override def newRefreshToken(
@@ -326,7 +351,11 @@ object PostgresOAuthRepository:
             )
 
         def removeToken(): TokenAttemptCIO[Unit] =
-          repository.tokenDataSource.deleteToken(clientId, appId)
+          repository.tokenDataSource.deleteToken(
+            clientId = clientId,
+            appId    = appId,
+            status   = TokenStatus.Access.title
+          )
 
         for
           rmScopesRes ← removeScopes()
@@ -370,7 +399,11 @@ object PostgresOAuthRepository:
         yield removeVal.sequence map (_ ⇒ ())
 
       private def deleteRefreshTokenCIO(clientId: Long): TokenAttemptCIO[Unit] =
-        repository.tokenDataSource.deleteToken(clientId, None)
+        repository.tokenDataSource.deleteToken(
+          clientId = clientId,
+          appId    = None,
+          status   = TokenStatus.Refresh.title
+        )
 
       private def transactToken[T](tokenValueRes: Either[Throwable, String])(
         newToken: String ⇒ TokenAttemptCIO[T]

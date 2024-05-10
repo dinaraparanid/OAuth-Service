@@ -34,6 +34,12 @@ trait TokenDataSource[F[_] : Applicative, S]:
       tokenValue:   String,
     ): TokenAttemptF[TokenEntity]
 
+    def newPlatformAccessToken(
+      refreshToken: RefreshToken,
+      lifeSeconds:  Option[Long],
+      tokenValue:   String,
+    ): TokenAttemptF[TokenEntity]
+
     def newRefreshToken(
       clientId:     Long,
       clientSecret: String,
@@ -50,5 +56,6 @@ trait TokenDataSource[F[_] : Applicative, S]:
 
     def deleteToken(
       clientId: Long,
-      appId:    Option[Long]
+      appId:    Option[Long],
+      status:   String,
     ): TokenAttemptF[Unit]

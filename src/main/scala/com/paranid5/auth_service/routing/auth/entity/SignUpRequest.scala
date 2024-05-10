@@ -12,11 +12,11 @@ final case class SignUpRequest(
 
 object SignUpRequest:
   given Encoder[SignUpRequest] =
-    Encoder.forProduct3("username", "email", "encoded_password"): e ⇒
+    Encoder.forProduct3("username", "email", "password"): e ⇒
       (e.username, e.email, e.password)
 
   given Decoder[SignUpRequest] =
-    Decoder.forProduct3("username", "email", "encoded_password")(SignUpRequest.apply)
+    Decoder.forProduct3("username", "email", "password")(SignUpRequest.apply)
 
   given EncodePassword[SignUpRequest] with
     extension (self: SignUpRequest)

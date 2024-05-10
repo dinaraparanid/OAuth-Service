@@ -38,7 +38,7 @@ object PostgresUserDataSource:
         sql"""
         INSERT INTO "User" (username, email, password)
         VALUES ($username, $email, $encodedPassword)
-        RETURNING id
+        RETURNING user_id
         """.serialId
 
       override def updateUser(

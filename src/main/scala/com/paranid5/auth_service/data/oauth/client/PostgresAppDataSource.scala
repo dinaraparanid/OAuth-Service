@@ -45,7 +45,7 @@ object PostgresAppDataSource:
         sql"""
         INSERT INTO "App" (app_secret, app_name, thumbnail, callback_url, client_id)
         VALUES ($appSecret, $appName, $appThumbnail, $callbackUrl, $clientId)
-        RETURNING id
+        RETURNING app_id
         """.serialId
 
       override def deleteApp(appId: Long): ConnectionIO[Unit] =

@@ -21,14 +21,24 @@ object App extends IOApp:
 
   private def runServer(): AppDependencies[IO[ExitCode]] =
     Reader: appModule ⇒
-      EmberServerBuilder
-        .default[IO]
-        .withHost(ipv4"0.0.0.0")
-        .withPort(port"4000")
-        .withHttpApp(appService run appModule)
-        .build
-        .use(_ => IO.never)
-        .as(ExitCode.Success)
+      def impl: IO[ExitCode] =
+        EmberServerBuilder
+          .default[IO]
+          .withHost(ipv4"0.0.0.0")
+          .withPort(port"4000")
+          .withHttpApp(appService run appModule)
+          .build
+          .use(_ => IO.never)
+          .as(ExitCode.Success)
+
+      val authRepository = appModule.userModule.userRepository
+      val oauthRepository = appModule.oauthModule.oauthRepository
+
+      for
+        _   ← authRepository.createTables()
+        _   ← oauthRepository.createTables()
+        res ← impl
+      yield res
 
   private def appService: AppDependencies[Kleisli[IO, Request[IO], Response[IO]]] =
     for

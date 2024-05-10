@@ -21,20 +21,21 @@ object PostgresTokenDataSource:
       override def createTable(): ConnectionIO[Unit] =
         sql"""
         CREATE TABLE IF NOT EXISTS "Token" (
+          token_id SERIAL PRIMARY KEY,
           client_id INTEGER NOT NULL REFERENCES "Client"(client_id) ON DELETE CASCADE,
           app_id INTEGER REFERENCES "App"(app_id) ON DELETE CASCADE,
           value TEXT NOT NULL,
-          life_seconds INTEGER,
-          created_at INTEGER NOT NULL,
+          life_seconds BIGINT,
+          created_at BIGINT NOT NULL,
           status VARCHAR(10) NOT NULL,
-          PRIMARY KEY (client_id, app_id, value)
+          UNIQUE(client_id, app_id, value)
         )
         """.effect
 
       override def getClientAccessTokens(clientId: Long): ConnectionIO[List[TokenEntity]] =
         sql"""
         SELECT * FROM "Token"
-        WHERE client_id = $clientId AND status = "access"
+        WHERE client_id = $clientId AND status = 'access'
         """.list[TokenEntity]
 
       override def getPlatformClientAccessToken(
@@ -42,13 +43,13 @@ object PostgresTokenDataSource:
       ): ConnectionIO[Option[TokenEntity]] =
         sql"""
         SELECT * FROM "Token"
-        WHERE client_id = $clientId AND status = "access" AND app_id is NULL
+        WHERE client_id = $clientId AND status = 'access' AND app_id IS NULL
         """.option[TokenEntity]
 
       override def getClientRefreshToken(clientId: Long): ConnectionIO[Option[RefreshToken]] =
         sql"""
         SELECT * FROM "Token"
-        WHERE client_id = $clientId AND status = "refresh"
+        WHERE client_id = $clientId AND status = 'refresh'
         """.option[RefreshToken]
 
       override def findToken(
@@ -90,6 +91,26 @@ object PostgresTokenDataSource:
           token ← impl(tokenValue)
         yield token
 
+      override def newPlatformAccessToken(
+        refreshToken: RefreshToken,
+        lifeSeconds:  Option[Long],
+        tokenValue:   String,
+      ): TokenAttemptF[TokenEntity] =
+        def impl(tokenValue: String): TokenAttemptF[TokenEntity] =
+          newToken(
+            clientId    = refreshToken.clientId,
+            appId       = None,
+            value       = tokenValue,
+            lifeSeconds = lifeSeconds,
+            createdAt   = System.currentTimeMillis,
+            status      = TokenStatus.Access.title
+          )
+
+        for
+          _     ← isTokenValid(refreshToken)
+          token ← impl(tokenValue)
+        yield token
+
       override def newRefreshToken(
         clientId:     Long,
         clientSecret: String,
@@ -105,7 +126,7 @@ object PostgresTokenDataSource:
         )
 
       override def isTokenValid(token: TokenEntity): ConnectionIO[Either[InvalidTokenReason, Unit]] =
-        val TokenEntity(clientId, appId, value, lifeSeconds, createdAt, status) = token
+        val TokenEntity(_, clientId, appId, value, lifeSeconds, createdAt, status) = token
         for foundTokenOpt ← getToken(clientId = clientId, appId = appId, value = value)
           yield foundTokenOpt
             .toRight(InvalidTokenReason.NotFound)
@@ -118,19 +139,42 @@ object PostgresTokenDataSource:
         appId:    Option[Long],
         value:    String
       ): ConnectionIO[Option[TokenEntity]] =
-        sql"""
-        SELECT * FROM "Token"
-        WHERE client_id = $clientId AND app_id = $appId AND value = $value
-        """.option[TokenEntity]
+        def query: Fragment =
+          appId match
+            case Some(id) ⇒
+              sql"""
+              SELECT * FROM "Token"
+              WHERE client_id = $clientId AND app_id = $id AND value = $value
+              """
+
+            case None ⇒
+              sql"""
+              SELECT * FROM "Token"
+              WHERE client_id = $clientId AND app_id IS NULL AND value = $value
+              """
+
+        query.option[TokenEntity]
 
       override def deleteToken(
         clientId: Long,
-        appId:    Option[Long]
+        appId:    Option[Long],
+        status:   String,
       ): TokenAttemptF[Unit] =
-        sql"""
-        DELETE FROM "Token"
-        WHERE client_id = $clientId AND app_id = $appId
-        """.attemptDelete
+        def query: Fragment =
+          appId match
+            case Some(id) ⇒
+              sql"""
+              DELETE FROM "Token"
+              WHERE client_id = $clientId AND app_id = $id AND status = $status
+              """
+
+            case None ⇒
+              sql"""
+              DELETE FROM "Token"
+              WHERE client_id = $clientId AND app_id IS NULL AND status = $status
+              """
+
+        query.attemptDelete
 
       private def newToken(
         clientId:    Long,
@@ -143,17 +187,21 @@ object PostgresTokenDataSource:
         sql"""
         INSERT INTO "Token" (client_id, app_id, value, life_seconds, created_at, status)
         VALUES ($clientId, $appId, $value, $lifeSeconds, $createdAt, $status)
-        """.attemptInsert:
-          TokenEntity(clientId, appId, value, lifeSeconds, createdAt, status)
+        RETURNING token_id
+        """.attemptInsert: tokenId ⇒
+          TokenEntity(tokenId, clientId, appId, value, lifeSeconds, createdAt, status)
 
   extension (query: Fragment)
     private def attemptInsert(
-      token: TokenEntity
+      token: Long ⇒ TokenEntity
     ): ConnectionIO[Either[InvalidTokenReason, TokenEntity]] =
-      query.update.run.attempt.map: res ⇒
+      query.serialId.attempt.map: res ⇒
         res.bimap(
-          fa = _ ⇒ InvalidTokenReason.GenerationError,
-          fb = _ ⇒ token,
+          fa = x ⇒ {
+            x.printStackTrace()
+            InvalidTokenReason.GenerationError
+          },
+          fb = token,
         )
 
     private def attemptDelete: ConnectionIO[Either[InvalidTokenReason, Unit]] =

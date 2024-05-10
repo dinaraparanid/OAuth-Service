@@ -34,7 +34,7 @@ object PostgresClientDataSource:
       ): ConnectionIO[Option[ClientEntity]] =
         sql"""
         SELECT * FROM  "Client"
-        WHERE client_id = $clientId AND client_secret = $clientSecret
+        WHERE client_secret = $clientSecret
         """.option[ClientEntity]
 
       override def insertClient(

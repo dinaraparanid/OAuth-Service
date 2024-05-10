@@ -35,6 +35,7 @@ import org.http4s.{DecodeResult, Request, Response}
  * {{{
  *   {
  *     "access_token":  {
+ *       "token_id":     1,
  *       "client_id":    123,
  *       "app_id":       234,
  *       "value":        "abcdef", // 45-th length string
@@ -43,6 +44,7 @@ import org.http4s.{DecodeResult, Request, Response}
  *       "status":       "access"
  *     },
  *     "refresh_token":  {
+ *       "token_id":     2,
  *       "client_id":    123,
  *       "app_id":       null,     // always null
  *       "value":        "abcdef", // 45-th length string

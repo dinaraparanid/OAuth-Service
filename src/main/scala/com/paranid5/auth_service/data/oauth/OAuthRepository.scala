@@ -95,13 +95,7 @@ trait OAuthRepository[F[_] : Applicative, R]:
       refreshToken:     RefreshToken,
       lifeSeconds:      Option[Long]     = Option(AccessTokenAliveTime),
       scopes:           List[TokenScope] = Nil
-    ): TokenAttemptF[AccessToken] =
-      repository.newAppAccessToken(
-        refreshToken     = refreshToken,
-        accessTokenAppId = -1,
-        lifeSeconds      = lifeSeconds,
-        scopes           = scopes,
-      )
+    ): TokenAttemptF[AccessToken]
 
     def newRefreshToken(
       clientId:     Long,

@@ -20,8 +20,8 @@ object PostgresTokenScopeDataSource:
       override def createTable(): ConnectionIO[Unit] =
         sql"""
         CREATE TABLE IF NOT EXISTS "Token_Scope" (
-          client_id INTEGER NOT NULL REFERENCES "Token"(client_id) ON DELETE CASCADE,
-          token_app_id INTEGER NOT NULL REFERENCES "Token"(app_id) ON DELETE CASCADE,
+          client_id INTEGER NOT NULL REFERENCES "Client"(client_id) ON DELETE CASCADE,
+          token_app_id INTEGER REFERENCES "App"(app_id) ON DELETE CASCADE,
           scope TEXT NOT NULL,
           PRIMARY KEY (client_id, token_app_id, scope)
         )
@@ -29,17 +29,28 @@ object PostgresTokenScopeDataSource:
 
       override def getTokenScopes(
         clientId:         Long,
-        accessTokenAppId: Long
+        accessTokenAppId: Option[Long],
       ): ConnectionIO[List[TokenScopeRelation]] =
-        sql"""
-        SELECT * FROM "Token_Scope"
-        WHERE client_id = $clientId AND token_app_id = $accessTokenAppId
-        """.list[TokenScopeRelation]
+        def query: Fragment =
+          accessTokenAppId match
+            case Some(id) ⇒
+              sql"""
+              SELECT * FROM "Token_Scope"
+              WHERE client_id = $clientId AND token_app_id = $id
+              """
+
+            case None ⇒
+              sql"""
+              SELECT * FROM "Token_Scope"
+              WHERE client_id = $clientId AND token_app_id IS NULL
+              """
+
+        query.list[TokenScopeRelation]
 
       override def addScopeToToken(
         clientId:         Long,
-        accessTokenAppId: Long,
-        scope:            String
+        accessTokenAppId: Option[Long],
+        scope:            String,
       ): ConnectionIO[Either[InvalidScopeReason, Unit]] =
         sql"""
         INSERT INTO "Token_Scope" (client_id, token_app_id, scope)
@@ -48,8 +59,8 @@ object PostgresTokenScopeDataSource:
 
       override def removeScopeFromToken(
         clientId:         Long,
-        accessTokenAppId: Long,
-        scope:            String
+        accessTokenAppId: Option[Long],
+        scope:            String,
       ): TokenScopeAttemptF[Unit] =
         sql"""
         DELETE FROM "Token_Scope"
@@ -62,10 +73,21 @@ object PostgresTokenScopeDataSource:
         clientId:         Long,
         accessTokenAppId: Option[Long],
       ): TokenScopeAttemptF[Unit] =
-        sql"""
-        DELETE FROM "Token_Scope"
-        WHERE client_id = $clientId AND token_app_id is $accessTokenAppId
-        """.attemptDelete
+        def query: Fragment =
+          accessTokenAppId match
+            case Some(id) ⇒
+              sql"""
+              DELETE FROM "Token_Scope"
+              WHERE client_id = $clientId AND token_app_id = $id
+              """
+
+            case None ⇒
+              sql"""
+              DELETE FROM "Token_Scope"
+              WHERE client_id = $clientId AND token_app_id IS NULL
+              """
+
+        query.attemptDelete
 
   extension (query: Fragment)
     private def attemptInsert: ConnectionIO[Either[InvalidScopeReason, Unit]] =

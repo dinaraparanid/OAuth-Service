@@ -16,8 +16,8 @@ def generateToken(tokenPrefix: String): IO[Either[Throwable, String]] =
     yield f"$tokenPrefix${System.currentTimeMillis}$token".encodedToSha.toEither
 
 def generateSecret: IO[Either[Throwable, String]] =
-  for clientSecret ← generateCodeImpl(SecretSize)
-    yield f"${System.currentTimeMillis}$clientSecret".encodedToSha.toEither
+  for secret ← generateCodeImpl(SecretSize)
+    yield f"${System.currentTimeMillis}$secret".encodedToSha.toEither
 
 extension (bytes: Array[Byte])
   private def toHex: String =

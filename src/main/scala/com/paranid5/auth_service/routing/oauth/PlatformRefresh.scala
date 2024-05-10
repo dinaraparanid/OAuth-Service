@@ -8,8 +8,8 @@ import com.paranid5.auth_service.data.oauth.token.error.InvalidTokenReason
 import com.paranid5.auth_service.routing.*
 import com.paranid5.auth_service.routing.oauth.entity.RefreshRequest
 import com.paranid5.auth_service.routing.oauth.response.accessTokenRefreshed
-import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
 
+import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
 import org.http4s.dsl.io.*
 import org.http4s.{DecodeResult, Request, Response}
 
@@ -38,6 +38,7 @@ import org.http4s.{DecodeResult, Request, Response}
  * {{{
  *   {
  *     "access_token":  {
+ *       "token_id":     1
  *       "client_id":    123,
  *       "app_id":       null,     // always null
  *       "value":        "abcdef", // 45-th length string
@@ -96,7 +97,7 @@ private def onPlatformRefresh(
         _              ← oauthRepository.deletePlatformAccessTokenWithScopes(clientId)
         accessTokenRes ← oauthRepository.newPlatformAccessToken(refreshToken)
         response ← accessTokenRes.fold(
-          fa = _ ⇒ somethingWentWrong,
+          fa = x ⇒ somethingWentWrong,
           fb = t ⇒ accessTokenRefreshed(t.entity)
         )
       yield response

@@ -11,20 +11,7 @@ import org.http4s.dsl.io.*
 def manageAppService: AppRoutes =
   Reader: appModule ⇒
     HttpRoutes.of[IO]:
-      case query @ POST → Root ⇒
-        onCreate(query) run appModule
-
-      case query @ GET → Root :? AppIdParamMatcher(appId) ⇒
-        onFind(query) run appModule
-
-      case query @ PATCH → Root
-        :? ClientIdParamMatcher(clientId)
-        +& AppIdParamMatcher(appId)
-        +& AppSecretParamMatcher(appSecret) ⇒
-        onUpdate(query) run appModule
-
-      case query @ DELETE → Root
-        :? ClientIdParamMatcher(clientId)
-        +& AppIdParamMatcher(appId)
-        +& AppSecretParamMatcher(appSecret) ⇒
-        onDelete(query) run appModule
+      case query @ POST   → Root ⇒ onCreate(query) run appModule
+      case query @ GET    → Root ⇒ onFind(query)   run appModule
+      case query @ PATCH  → Root ⇒ onUpdate(query) run appModule
+      case query @ DELETE → Root ⇒ onDelete(query) run appModule

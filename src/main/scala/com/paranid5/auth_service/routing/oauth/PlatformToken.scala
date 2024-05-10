@@ -33,6 +33,7 @@ import org.http4s.{DecodeResult, Request, Response}
  * {{{
  *   {
  *     "access_token":  {
+ *       "token_id":     1,
  *       "client_id":    123,
  *       "app_id":       null,     // always null
  *       "value":        "abcdef", // 45-th length string
@@ -41,6 +42,7 @@ import org.http4s.{DecodeResult, Request, Response}
  *       "status":       "access"
  *     },
  *     "refresh_token":  {
+ *       "token_id":     2,
  *       "client_id":    123,
  *       "app_id":       null,     // always null
  *       "value":        "abcdef", // 45-th length string
@@ -63,6 +65,8 @@ private def onPlatformToken(
     val oauthRepository = appModule.oauthModule.oauthRepository
 
     def retrieveCredentials: IO[Response[IO]] =
+      println(clientId)
+      println(clientSecret)
       for
         clientOpt ← oauthRepository.findClient(clientId, clientSecret)
         response  ← clientOpt.fold(
@@ -72,6 +76,7 @@ private def onPlatformToken(
       yield response
 
     def removeOldTokens(client: ClientEntity): IO[Response[IO]] =
+      println(client)
       for
         _        ← oauthRepository.deleteRefreshToken(client.clientId)
         _        ← oauthRepository.deletePlatformAccessTokenWithScopes(client.clientId)
