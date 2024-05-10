@@ -15,15 +15,7 @@ import org.http4s.{DecodeResult, Request, Response}
  * Retrieves all applications' info by client's credentials
  *
  * ==Route==
- * GET /app/all
- *
- * ==Body==
- * {{{
- *   {
- *     "client_id":     123
- *     "client_secret": "abcd"
- *   }
- * }}}
+ * GET /app/all?&client_id=123
  *
  * ==Response==
  * 1. [[BadRequest]] - "Invalid body"
@@ -43,20 +35,11 @@ import org.http4s.{DecodeResult, Request, Response}
  * }}}
  */
 
-private def onAll(query: Request[IO]): AppHttpResponse =
+private def onAll(clientId: Long): AppHttpResponse =
   Reader: appModule ⇒
     val oauthRepository = appModule.oauthModule.oauthRepository
 
-    def processRequest(requestRes: DecodeResult[IO, AllRequest]): IO[Response[IO]] =
-      for
-        responseIO ← requestRes.fold(_ ⇒ invalidBody, findApps)
-        response   ← responseIO
-      yield response
-
-    def findApps(request: AllRequest): IO[Response[IO]] =
-      for
-        apps     ← oauthRepository.getClientApps(request.clientId)
-        response ← clientApps(apps)
-      yield response
-
-    processRequest(query.attemptAs[AllRequest])
+    for
+      apps     ← oauthRepository.getClientApps(clientId)
+      response ← clientApps(apps)
+    yield response

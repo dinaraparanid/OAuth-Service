@@ -1,29 +1,17 @@
 package com.paranid5.auth_service.routing.app
 
 import cats.data.Reader
-import cats.effect.IO
 
 import com.paranid5.auth_service.routing.*
-import com.paranid5.auth_service.routing.app.entity.FindRequest
 import com.paranid5.auth_service.routing.app.response.*
 
-import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
 import org.http4s.dsl.io.*
-import org.http4s.{DecodeResult, Request, Response}
 
 /**
  * Retrieves application's info by its credentials
  *
  * ==Route==
- * GET /app
- *
- * ==Body==
- * {{{
- *   {
- *     "app_id":     123
- *     "app_secret": "abcd" // 10-th length string
- *   }
- * }}}
+ * GET /app?app_id=123&app_secret=secret
  *
  * ==Response==
  * 1. [[BadRequest]] - "Invalid body"
@@ -43,24 +31,18 @@ import org.http4s.{DecodeResult, Request, Response}
  * }}}
  */
 
-private def onFind(query: Request[IO]): AppHttpResponse =
+private def onFind(
+  appId:     Long,
+  appSecret: String,
+): AppHttpResponse =
   Reader: appModule ⇒
     val oauthRepository = appModule.oauthModule.oauthRepository
 
-    def processRequest(requestRes: DecodeResult[IO, FindRequest]): IO[Response[IO]] =
-      for
-        responseIO ← requestRes.fold(_ ⇒ invalidBody, findApp)
-        response   ← responseIO
-      yield response
+    for
+      appOpt ← oauthRepository.getApp(
+        appId     = appId,
+        appSecret = appSecret,
+      )
 
-    def findApp(request: FindRequest): IO[Response[IO]] =
-      for
-        appOpt ← oauthRepository.getApp(
-          appId     = request.appId,
-          appSecret = request.appSecret,
-        )
-
-        response ← appOpt.fold(ifEmpty = appNotFound)(f = appSuccessfullyFound)
-      yield response
-
-    processRequest(query.attemptAs[FindRequest])
+      response ← appOpt.fold(ifEmpty = appNotFound)(f = appSuccessfullyFound)
+    yield response
