@@ -65,8 +65,6 @@ private def onPlatformToken(
     val oauthRepository = appModule.oauthModule.oauthRepository
 
     def retrieveCredentials: IO[Response[IO]] =
-      println(clientId)
-      println(clientSecret)
       for
         clientOpt ← oauthRepository.findClient(clientId, clientSecret)
         response  ← clientOpt.fold(

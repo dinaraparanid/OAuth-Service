@@ -16,13 +16,17 @@ def manageAppService: AppRoutes =
         case query @ POST → Root ⇒ onCreate(query) run appModule
 
         case GET → (Root / "all") :? ClientIdParamMatcher(clientId) ⇒
-          onAll(clientId)    run appModule
+          onAll(clientId) run appModule
 
         case GET → Root
           :? AppIdParamMatcher(appId)
           +& AppSecretParamMatcher(appSecret) ⇒
           onFind(appId, appSecret) run appModule
 
-        case query @ PATCH → Root           ⇒ onUpdate(query) run appModule
+        case query @ PATCH → Root ⇒ onUpdate(query) run appModule
 
-        case query @ DELETE → Root           ⇒ onDelete(query) run appModule
+        case DELETE → Root
+          :? ClientIdParamMatcher(clientId)
+          +& AppIdParamMatcher(appId)
+          +& AppSecretParamMatcher(appSecret) ⇒
+          onDelete(clientId, appId, appSecret) run appModule
