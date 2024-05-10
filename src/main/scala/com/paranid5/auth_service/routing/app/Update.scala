@@ -4,29 +4,16 @@ import cats.data.Reader
 import cats.effect.IO
 
 import com.paranid5.auth_service.routing.*
-import com.paranid5.auth_service.routing.app.entity.UpdateRequest
 import com.paranid5.auth_service.routing.app.response.*
 
-import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
+import org.http4s.Response
 import org.http4s.dsl.io.*
-import org.http4s.{DecodeResult, Request, Response}
 
 /**
  * Updates application's metadata.
  *
  * ==Route==
- * PATCH /app
- *
- * ==Body==
- * {{{
- *   {
- *     "app_id":        123
- *     "app_secret":    "abcd"
- *     "app_name":      "App Title",              // non-empty string
- *     "app_thumbnail": "https://some_image.png", // optional
- *     "callback_url":  "https://...",             // optional
- *   }
- * }}}
+ * PATCH /app?app_id=123&app_secret=secret&app_name=name&app_thumbnail=https://image.png&redirect_url=https://...
  *
  * ==Response==
  * 1. [[BadRequest]] - "Invalid body"
@@ -38,36 +25,35 @@ import org.http4s.{DecodeResult, Request, Response}
  * 4. [[Ok]] - "App successfully updated"
  */
 
-private def onUpdate(query: Request[IO]): AppHttpResponse =
+private def onUpdate(
+  appId:        Long,
+  appSecret:    String,
+  appName:      String,
+  appThumbnail: Option[String],
+  redirectUrl:  Option[String]
+): AppHttpResponse =
   Reader: appModule ⇒
     val oauthRepository = appModule.oauthModule.oauthRepository
 
-    def processRequest(requestRes: DecodeResult[IO, UpdateRequest]): IO[Response[IO]] =
+    def validateRequest(): IO[Response[IO]] =
       for
-        responseIO ← requestRes.fold(_ ⇒ invalidBody, validateRequest)
-        response   ← responseIO
-      yield response
-
-    def validateRequest(request: UpdateRequest): IO[Response[IO]] =
-      for
-        oldAppOpt ← oauthRepository.getApp(request.appId, request.appSecret)
+        oldAppOpt ← oauthRepository.getApp(appId, appSecret)
         response  ← oldAppOpt.fold(
           ifEmpty = appNotFound)(
-          f       = _ ⇒ if request.appName.isEmpty then appNameMustNotBeEmpty
-                        else updateApp(request)
+          f       = _ ⇒ if appName.isEmpty then appNameMustNotBeEmpty else updateApp()
         )
       yield response
 
-    def updateApp(request: UpdateRequest): IO[Response[IO]] =
+    def updateApp(): IO[Response[IO]] =
       for
         appId ← oauthRepository.updateApp(
-          appId           = request.appId,
-          newAppName      = request.appName,
-          newAppThumbnail = request.appThumbnail,
-          newCallbackUrl  = request.callbackUrl,
+          appId           = appId,
+          newAppName      = appName,
+          newAppThumbnail = appThumbnail,
+          newCallbackUrl  = redirectUrl,
         )
 
         response ← appSuccessfullyUpdated
       yield response
 
-    processRequest(query.attemptAs[UpdateRequest])
+    validateRequest()

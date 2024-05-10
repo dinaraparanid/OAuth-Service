@@ -23,7 +23,13 @@ def manageAppService: AppRoutes =
           +& AppSecretParamMatcher(appSecret) ⇒
           onFind(appId, appSecret) run appModule
 
-        case query @ PATCH → Root ⇒ onUpdate(query) run appModule
+        case PATCH → Root
+          :? AppIdParamMatcher(appId)
+          +& AppSecretParamMatcher(appSecret)
+          +& AppNameParamMatcher(appName)
+          +& AppThumbnailParamMatcher(appThumbnail)
+          +& RedirectUrlParamMatcher(redirectUrl) ⇒
+          onUpdate(appId, appSecret, appName, appThumbnail, redirectUrl) run appModule
 
         case DELETE → Root
           :? ClientIdParamMatcher(clientId)
