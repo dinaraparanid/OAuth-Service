@@ -31,7 +31,7 @@ import org.http4s.{DecodeResult, Request, Response}
  *
  * 3. [[NotFound]] - "App was not found"
  *
- * 4. [[Found]] with both access and refresh tokens and redirect url:
+ * 4. [[Created]] with both access and refresh tokens and redirect url:
  * {{{
  *   {
  *     "access_token":  {

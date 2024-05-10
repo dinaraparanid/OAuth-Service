@@ -16,7 +16,7 @@ def tokensGenerated(
   refreshToken: TokenEntity,
   redirectUrl:  String,
 ): IO[Response[IO]] =
-  Found:
+  Created:
     TokenResponse(
       accessToken  = accessToken,
       refreshToken = refreshToken,

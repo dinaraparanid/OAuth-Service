@@ -45,4 +45,4 @@ private def credentialsGenerationError: IO[Response[IO]] =
   InternalServerError("User credentials generation error. Try again")
 
 private def redirectToCallbackUrl(callbackUrl: String): IO[Response[IO]] =
-  Found(callbackUrl)
+  Ok(callbackUrl)
