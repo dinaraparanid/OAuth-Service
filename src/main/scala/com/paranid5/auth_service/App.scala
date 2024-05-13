@@ -25,7 +25,7 @@ object App extends IOApp:
         EmberServerBuilder
           .default[IO]
           .withHost(ipv4"0.0.0.0")
-          .withPort(port"4000")
+          .withPort(port"8080")
           .withHttpApp(appService run appModule)
           .build
           .use(_ => IO.never)
