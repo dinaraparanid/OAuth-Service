@@ -58,7 +58,7 @@ private def onSignIn(query: Request[IO]): AppHttpResponse =
 
     def retrieveUserData(request: SignInRequest): IO[Response[IO]] =
       for
-        user     ← userRepository.getUserByEmail(request.email)
+        user     ← userRepository.getUserByEmailTransact(request.email)
         response ← processUserData(request.withEncodedPassword, user)
       yield response
 

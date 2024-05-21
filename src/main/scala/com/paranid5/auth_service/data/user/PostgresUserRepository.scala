@@ -1,11 +1,9 @@
 package com.paranid5.auth_service.data.user
 
-import cats.effect.IO
-
 import com.paranid5.auth_service.data.*
 import com.paranid5.auth_service.data.user.entity.User
 
-import doobie.syntax.all.*
+import doobie.free.connection.ConnectionIO
 
 final class PostgresUserRepository(
   private val transactor:     IOTransactor,
@@ -13,55 +11,53 @@ final class PostgresUserRepository(
 )
 
 object PostgresUserRepository:
-  given UserRepository[IO, PostgresUserRepository] with
+  given UserRepository[ConnectionIO, PostgresUserRepository] with
     extension (repository: PostgresUserRepository)
-      override def createTables(): IO[Unit] =
+      override def createTables(): ConnectionIO[Unit] =
         repository
           .userDataSource
           .createTable()
-          .transact(repository.transactor)
 
-      override def users: IO[List[User]] =
+      override def users: ConnectionIO[List[User]] =
         repository
           .userDataSource
           .users
-          .transact(repository.transactor)
 
-      override def getUser(userId: Long): IO[Option[User]] =
+      override def getUser(userId: Long): ConnectionIO[Option[User]] =
         repository
           .userDataSource
           .getUser(userId)
-          .transact(repository.transactor)
 
-      override def getUserByEmail(email: String): IO[Option[User]] =
+      override def getUserByEmail(email: String): ConnectionIO[Option[User]] =
         repository
           .userDataSource
           .getUserByEmail(email)
-          .transact(repository.transactor)
 
       override def storeUser(
         username:        String,
         email:           String,
         encodedPassword: String
-      ): IO[Long] =
+      ): ConnectionIO[Long] =
         repository
           .userDataSource
           .storeUser(username, email, encodedPassword)
-          .transact(repository.transactor)
 
       override def updateUser(
         userId:             Long,
         newUsername:        String,
         newEmail:           String,
         newEncodedPassword: String
-      ): IO[Unit] =
+      ): ConnectionIO[Unit] =
         repository
           .userDataSource
           .updateUser(userId, newUsername, newEmail, newEncodedPassword)
-          .transact(repository.transactor)
 
-      override def deleteUser(userId: Long): IO[Unit] =
+      override def deleteUser(userId: Long): ConnectionIO[Unit] =
         repository
           .userDataSource
           .deleteUser(userId)
-          .transact(repository.transactor)
+
+  given UserTransactions[PostgresUserRepository] with
+    extension (repository: PostgresUserRepository)
+      override protected def transactor: IOTransactor =
+        repository.transactor

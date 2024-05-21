@@ -6,9 +6,9 @@ import cats.effect.{ExitCode, IO, IOApp}
 import com.comcast.ip4s.{ipv4, port}
 
 import com.paranid5.auth_service.di.{AppDependencies, AppModule}
-import com.paranid5.auth_service.routing.app.manageAppService
-import com.paranid5.auth_service.routing.auth.authService
-import com.paranid5.auth_service.routing.oauth.oauthService
+import com.paranid5.auth_service.routing.app.manageAppRoutes
+import com.paranid5.auth_service.routing.auth.authRoutes
+import com.paranid5.auth_service.routing.oauth.oauthRoutes
 
 import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.server.Router
@@ -35,16 +35,16 @@ object App extends IOApp:
       val oauthRepository = appModule.oauthModule.oauthRepository
 
       for
-        _   ← authRepository.createTables()
+        _   ← authRepository.createTablesTransact()
         _   ← oauthRepository.createTables()
         res ← impl
       yield res
 
   private def appService: AppDependencies[Kleisli[IO, Request[IO], Response[IO]]] =
     for
-      auth      ← authService
-      oauth     ← oauthService
-      manageApp ← manageAppService
+      auth      ← authRoutes
+      oauth     ← oauthRoutes
+      manageApp ← manageAppRoutes
     yield Router(
       "/auth"  -> auth,
       "/oauth" -> oauth,

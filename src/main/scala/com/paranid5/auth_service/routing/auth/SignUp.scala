@@ -62,7 +62,7 @@ private def onSignUp(query: Request[IO]): AppHttpResponse =
       val encodedRequest = request.withEncodedPassword
 
       for
-        user     ← userRepository.getUserByEmail(encodedRequest.email)
+        user     ← userRepository.getUserByEmailTransact(encodedRequest.email)
         response ← processUserData(user, encodedRequest)
       yield response
 
@@ -77,7 +77,7 @@ private def onSignUp(query: Request[IO]): AppHttpResponse =
 
     def addNewUser(encodedUserData: SignUpRequest): IO[Response[IO]] =
       for
-        clientId ← userRepository.storeUser(
+        clientId ← userRepository.storeUserTransact(
           username        = encodedUserData.username,
           email           = encodedUserData.email,
           encodedPassword = encodedUserData.password

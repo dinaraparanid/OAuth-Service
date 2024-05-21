@@ -9,11 +9,12 @@ import org.http4s.{HttpRoutes, Request, Response}
 import org.http4s.dsl.io.*
 import org.http4s.server.middleware.CORS
 
-def manageAppService: AppRoutes =
+def manageAppRoutes: AppRoutes =
   Reader: appModule ⇒
     CORS.policy.withAllowOriginAll:
       HttpRoutes.of[IO]:
-        case query @ POST → Root ⇒ onCreate(query) run appModule
+        case query @ POST → Root ⇒
+          onCreate(query) run appModule
 
         case GET → (Root / "all") :? ClientIdParamMatcher(clientId) ⇒
           onAll(clientId) run appModule

@@ -9,7 +9,7 @@ import org.http4s.dsl.io.*
 import org.http4s.server.middleware.CORS
 import org.http4s.{HttpRoutes, Request, Response}
 
-def authService: AppRoutes =
+def authRoutes: AppRoutes =
   Reader: appModule ⇒
     CORS.policy.withAllowOriginAll:
       HttpRoutes.of[IO]: // TODO: проверка email-а + восстановление пароля

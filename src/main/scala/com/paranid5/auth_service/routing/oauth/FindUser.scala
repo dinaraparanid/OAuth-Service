@@ -47,7 +47,7 @@ private def onFindUser(accessToken: String): AppHttpResponse =
 
     def retrieveUser(token: TokenEntity): IO[Response[IO]] =
       for
-        userOpt       ← userRepository.getUser(userId = token.clientId)
+        userOpt       ← userRepository.getUserTransact(userId = token.clientId)
         clientOpt     ← oauthRepository.getClient(clientId = token.clientId)
         userClientOpt = (userOpt, clientOpt) mapN ((user, client) ⇒ (user, client))
         response      ← userClientOpt.fold(

@@ -9,7 +9,7 @@ import org.http4s.dsl.io.*
 import org.http4s.server.middleware.CORS
 import org.http4s.{HttpRoutes, Request, Response}
 
-def oauthService: AppRoutes =
+def oauthRoutes: AppRoutes =
   Reader: appModule ⇒
     CORS.policy.withAllowOriginAll:
       HttpRoutes.of[IO]:
@@ -55,4 +55,3 @@ def oauthService: AppRoutes =
 
         case GET → (Root / "user") :? AccessTokenParamMatcher(accessToken) ⇒
           onFindUser(accessToken) run appModule
-
