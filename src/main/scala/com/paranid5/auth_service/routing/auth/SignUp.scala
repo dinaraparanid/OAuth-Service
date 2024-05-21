@@ -2,6 +2,7 @@ package com.paranid5.auth_service.routing.auth
 
 import cats.data.Reader
 import cats.effect.IO
+import cats.free.Free
 import cats.syntax.all.*
 
 import com.paranid5.auth_service.data.user.entity.User
@@ -9,6 +10,9 @@ import com.paranid5.auth_service.domain.generateSecret
 import com.paranid5.auth_service.routing.*
 import com.paranid5.auth_service.routing.auth.entity.SignUpRequest
 import com.paranid5.auth_service.routing.auth.response.userSuccessfullyRegistered
+
+import doobie.free.connection.ConnectionIO
+import doobie.syntax.all.*
 
 import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
 import org.http4s.dsl.io.*
@@ -53,57 +57,56 @@ private def onSignUp(query: Request[IO]): AppHttpResponse =
     val oauthRepository = appModule.oauthModule.oauthRepository
 
     def processRequest(requestRes: DecodeResult[IO, SignUpRequest]): IO[Response[IO]] =
-      for
-        responseIO ← requestRes.fold(_ ⇒ invalidBody, retrieveUserData)
-        response   ← responseIO
-      yield response
+      requestRes
+        .fold(fa = Left(_), fb = x ⇒ Right(retrieveUserData(x)))
+        .map: res ⇒
+          res
+            .sequence
+            .map(_ getOrElse invalidBody)
+            .transact(appModule.transcactor)
+        .flatten
+        .flatten
 
-    def retrieveUserData(request: SignUpRequest): IO[Response[IO]] =
+    def retrieveUserData(request: SignUpRequest): ConnectionIO[IO[Response[IO]]] =
       val encodedRequest = request.withEncodedPassword
 
       for
-        user     ← userRepository.getUserByEmailTransact(encodedRequest.email)
+        user     ← userRepository.getUserByEmail(encodedRequest.email)
         response ← processUserData(user, encodedRequest)
       yield response
 
     def processUserData(
       foundUser:       Option[User],
       encodedUserData: SignUpRequest,
-    ): IO[Response[IO]] =
-      foundUser.fold(
-        ifEmpty = addNewUser(encodedUserData))(
-        f       = _ ⇒ userAlreadyRegistered
-      )
+    ): ConnectionIO[IO[Response[IO]]] =
+      foundUser
+        .toLeft(())
+        .map(_ ⇒ addNewUser(encodedUserData))
+        .sequence
+        .map(_ getOrElse userAlreadyRegistered)
 
-    def addNewUser(encodedUserData: SignUpRequest): IO[Response[IO]] =
+    def addNewUser(encodedUserData: SignUpRequest): ConnectionIO[IO[Response[IO]]] =
       for
-        clientId ← userRepository.storeUserTransact(
+        clientId ← userRepository.storeUser(
           username        = encodedUserData.username,
           email           = encodedUserData.email,
           encodedPassword = encodedUserData.password
         )
 
-        clientSecretRes ← generateSecret
+        clientSecretRes ← generateSecret[ConnectionIO]
         response        ← processGeneratedCredentials(clientId, clientSecretRes)
       yield response
 
     def processGeneratedCredentials(
       clientId:     Long,
       clientSecret: Either[Throwable, String]
-    ): IO[Response[IO]] =
-      val genCredentials = clientSecret map ((clientId, _))
-
-      for
-        insertionRes ← clientSecret
-          .map: clientSecret ⇒
-            oauthRepository.insertClient(clientId, clientSecret)
-              *> IO((clientId, clientSecret))
-          .sequence
-
-        response ← insertionRes.fold(
-          fa = _                        ⇒ credentialsGenerationError,
-          fb = (clientId, clientSecret) ⇒ userSuccessfullyRegistered(clientId, clientSecret)
-        )
-      yield response
+    ): ConnectionIO[IO[Response[IO]]] =
+      clientSecret
+        .map: clientSecret ⇒
+          oauthRepository
+            .insertClient(clientId, clientSecret)
+            .map(_ ⇒ userSuccessfullyRegistered(clientId, clientSecret))
+        .sequence
+        .map(_ getOrElse credentialsGenerationError)
 
     processRequest(query.attemptAs[SignUpRequest])

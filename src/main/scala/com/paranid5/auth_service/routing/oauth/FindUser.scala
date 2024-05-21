@@ -10,6 +10,8 @@ import com.paranid5.auth_service.routing.oauth.response.userMetadata
 import org.http4s.Response
 import org.http4s.dsl.io.*
 
+import doobie.syntax.all.*
+
 /**
  * Retrieves user metadata by access token.
  *
@@ -41,14 +43,23 @@ private def onFindUser(accessToken: String): AppHttpResponse =
 
     def validateRequest(): IO[Response[IO]] =
       for
-        tokenRes ← oauthRepository.retrieveToken(accessToken)
+        tokenRes ← oauthRepository
+          .retrieveToken(accessToken)
+          .transact(appModule.transcactor)
+
         response ← tokenRes.fold(_ ⇒ tokenNotFound, retrieveUser)
       yield response
 
     def retrieveUser(token: TokenEntity): IO[Response[IO]] =
       for
-        userOpt       ← userRepository.getUserTransact(userId = token.clientId)
-        clientOpt     ← oauthRepository.getClient(clientId = token.clientId)
+        userOpt       ← userRepository
+          .getUser(userId = token.clientId)
+          .transact(appModule.transcactor)
+
+        clientOpt     ← oauthRepository
+          .getClient(clientId = token.clientId)
+          .transact(appModule.transcactor)
+
         userClientOpt = (userOpt, clientOpt) mapN ((user, client) ⇒ (user, client))
         response      ← userClientOpt.fold(
           ifEmpty = clientNotFound)(

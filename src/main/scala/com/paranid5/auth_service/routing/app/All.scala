@@ -7,6 +7,8 @@ import com.paranid5.auth_service.routing.*
 import com.paranid5.auth_service.routing.app.entity.AllRequest
 import com.paranid5.auth_service.routing.app.response.*
 
+import doobie.syntax.all.*
+
 import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
 import org.http4s.dsl.io.*
 import org.http4s.{DecodeResult, Request, Response}
@@ -40,6 +42,9 @@ private def onAll(clientId: Long): AppHttpResponse =
     val oauthRepository = appModule.oauthModule.oauthRepository
 
     for
-      apps     ← oauthRepository.getClientApps(clientId)
+      apps ← oauthRepository
+        .getClientApps(clientId)
+        .transact(appModule.transcactor)
+
       response ← clientApps(apps)
     yield response

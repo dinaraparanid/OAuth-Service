@@ -8,6 +8,8 @@ import com.paranid5.auth_service.routing.*
 import com.paranid5.auth_service.routing.app.entity.CreateRequest
 import com.paranid5.auth_service.routing.app.response.*
 
+import doobie.syntax.all.*
+
 import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
 import org.http4s.dsl.io.*
 import org.http4s.{DecodeResult, Request, Response}
@@ -61,7 +63,7 @@ private def onCreate(query: Request[IO]): AppHttpResponse =
 
     def generateCredentials(request: CreateRequest): IO[Response[IO]] =
       for
-        appSecretRes ← generateSecret
+        appSecretRes ← generateSecret[IO]
         response     ← appSecretRes.fold(
           fa = _ ⇒ credentialsGenerationError,
           fb = createApp(request, _)
@@ -76,7 +78,7 @@ private def onCreate(query: Request[IO]): AppHttpResponse =
           appThumbnail = request.appThumbnail,
           callbackUrl  = request.callbackUrl,
           clientId     = request.clientId
-        )
+        ).transact(appModule.transcactor)
 
         response ← appSuccessfullyCreated(appId, appSecret)
       yield response

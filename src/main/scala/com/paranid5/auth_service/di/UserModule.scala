@@ -8,4 +8,4 @@ final class UserModule(transactor: IOTransactor):
     PostgresUserDataSource()
 
   lazy val userRepository: PostgresUserRepository =
-    PostgresUserRepository(transactor, userDataSource)
+    PostgresUserRepository(userDataSource)

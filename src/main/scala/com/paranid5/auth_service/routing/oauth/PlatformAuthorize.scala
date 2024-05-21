@@ -7,6 +7,8 @@ import com.paranid5.auth_service.data.oauth.token.entity.AccessToken
 import com.paranid5.auth_service.routing.oauth.entity.AuthorizeRequest
 import com.paranid5.auth_service.routing.*
 
+import doobie.syntax.all.*
+
 import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
 import org.http4s.dsl.io.*
 import org.http4s.{DecodeResult, Request, Response}
@@ -52,7 +54,10 @@ private def onPlatformAuthorize(
 
     def retrieveToken(request: AuthorizeRequest): IO[Response[IO]] =
       for
-        tokenOpt ← oauthRepository.getPlatformClientAccessToken(clientId)
+        tokenOpt ← oauthRepository
+          .getPlatformClientAccessToken(clientId)
+          .transact(appModule.transcactor)
+
         response ← processToken(request.token, tokenOpt)
       yield response
 
@@ -70,7 +75,7 @@ private def onPlatformAuthorize(
         isValid ← oauthRepository.isTokenValid(
           clientId   = token.entity.clientId,
           tokenValue = token.entity.value
-        )
+        ).transact(appModule.transcactor)
 
         response ← isValid.fold(
           fa = invalidToken,

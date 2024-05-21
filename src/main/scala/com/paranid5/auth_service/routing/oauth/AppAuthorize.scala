@@ -8,6 +8,8 @@ import com.paranid5.auth_service.data.oauth.token.entity.AccessToken
 import com.paranid5.auth_service.routing.*
 import com.paranid5.auth_service.routing.oauth.entity.AuthorizeRequest
 
+import doobie.syntax.all.*
+
 import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
 import org.http4s.{DecodeResult, Request, Response}
 
@@ -56,7 +58,10 @@ private def onAppAuthorize(
 
     def retrieveApp(request: AuthorizeRequest): IO[Response[IO]] =
       for
-        appOpt   ← oauthRepository.getApp(appId, appSecret)
+        appOpt ← oauthRepository
+          .getApp(appId, appSecret)
+          .transact(appModule.transcactor)
+
         response ← processApp(request.token, appOpt)
       yield response
 
@@ -76,7 +81,10 @@ private def onAppAuthorize(
       app:          AppEntity
     ): IO[Response[IO]] =
       for
-        tokenOpt    ← oauthRepository.getAppAccessToken(clientId, appId, appSecret)
+        tokenOpt    ← oauthRepository
+          .getAppAccessToken(clientId, appId, appSecret)
+          .transact(appModule.transcactor)
+
         callbackUrl = app.callbackUrl getOrElse (redirectUrl getOrElse DefaultRedirect)
         response    ← processToken(callbackUrl, requestToken, tokenOpt)
       yield response
@@ -99,7 +107,7 @@ private def onAppAuthorize(
         isValid ← oauthRepository.isTokenValid(
           clientId   = token.entity.clientId,
           tokenValue = token.entity.value
-        )
+        ).transact(appModule.transcactor)
 
         response ← isValid.fold(
           fa = invalidToken,

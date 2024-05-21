@@ -10,6 +10,9 @@ import com.paranid5.auth_service.routing.app.manageAppRoutes
 import com.paranid5.auth_service.routing.auth.authRoutes
 import com.paranid5.auth_service.routing.oauth.oauthRoutes
 
+import doobie.free.connection.ConnectionIO
+import doobie.syntax.all.*
+
 import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.server.Router
 import org.http4s.{Request, Response}
@@ -21,6 +24,15 @@ object App extends IOApp:
 
   private def runServer(): AppDependencies[IO[ExitCode]] =
     Reader: appModule ⇒
+      val authRepository = appModule.userModule.userRepository
+      val oauthRepository = appModule.oauthModule.oauthRepository
+
+      def createTables(): ConnectionIO[Unit] =
+        for
+          _ ← authRepository.createTables()
+          _ ← oauthRepository.createTables()
+        yield ()
+
       def impl: IO[ExitCode] =
         EmberServerBuilder
           .default[IO]
@@ -31,12 +43,8 @@ object App extends IOApp:
           .use(_ => IO.never)
           .as(ExitCode.Success)
 
-      val authRepository = appModule.userModule.userRepository
-      val oauthRepository = appModule.oauthModule.oauthRepository
-
       for
-        _   ← authRepository.createTablesTransact()
-        _   ← oauthRepository.createTables()
+        _   ← createTables().transact(appModule.transcactor)
         res ← impl
       yield res
 

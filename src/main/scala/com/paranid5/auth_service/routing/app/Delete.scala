@@ -6,6 +6,8 @@ import cats.effect.IO
 import com.paranid5.auth_service.routing.*
 import com.paranid5.auth_service.routing.app.response.*
 
+import doobie.syntax.all.*
+
 import org.http4s.Response
 import org.http4s.dsl.io.*
 
@@ -34,7 +36,10 @@ private def onDelete(
 
     def validateRequest(): IO[Response[IO]] =
       for
-        appOpt   ← oauthRepository.getApp(appId, appSecret)
+        appOpt ← oauthRepository
+          .getApp(appId, appSecret)
+          .transact(appModule.transcactor)
+
         response ← appOpt.fold(ifEmpty = appNotFound)(_ ⇒ deleteApp())
       yield response
 
@@ -44,7 +49,7 @@ private def onDelete(
           clientId  = clientId,
           appId     = appId,
           appSecret = appSecret,
-        )
+        ).transact(appModule.transcactor)
 
         response ← appSuccessfullyDeleted
       yield response

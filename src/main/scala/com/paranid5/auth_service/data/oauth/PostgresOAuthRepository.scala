@@ -1,8 +1,8 @@
 package com.paranid5.auth_service.data.oauth
 
 import cats.data.ValidatedNec
-import cats.effect.IO
 import cats.syntax.all.*
+
 import com.paranid5.auth_service.data.*
 import com.paranid5.auth_service.data.oauth.client.entity.{AppEntity, ClientEntity}
 import com.paranid5.auth_service.data.oauth.client.{PostgresAppDataSource, PostgresClientDataSource}
@@ -10,11 +10,11 @@ import com.paranid5.auth_service.data.oauth.token.entity.{AccessToken, RefreshTo
 import com.paranid5.auth_service.data.oauth.token.error.*
 import com.paranid5.auth_service.data.oauth.token.{PostgresTokenDataSource, PostgresTokenScopeDataSource}
 import com.paranid5.auth_service.domain.generateToken
+
 import doobie.free.connection.ConnectionIO
 import doobie.syntax.all.*
 
 final class PostgresOAuthRepository(
-  private val transactor:           IOTransactor,
   private val clientDataSource:     PostgresClientDataSource,
   private val appDataSource:        PostgresAppDataSource,
   private val tokenDataSource:      PostgresTokenDataSource,
@@ -22,108 +22,85 @@ final class PostgresOAuthRepository(
 )
 
 object PostgresOAuthRepository:
-  private type OAuthAttemptCIO     [T] = ConnectionIO[Either[InvalidOAuthReason, T]]
-  private type OAuthValidatedCIO   [T] = ConnectionIO[ValidatedNec[InvalidOAuthReason, T]]
-  private type TokenAttemptCIO     [T] = ConnectionIO[Either[InvalidTokenReason, T]]
-  private type TokenValidatedCIO   [T] = ConnectionIO[ValidatedNec[InvalidTokenReason, T]]
   private type TokenScopeAttemptCIO[T] = ConnectionIO[Either[InvalidScopeReason, T]]
 
-  given OAuthRepository[IO, PostgresOAuthRepository] with
-    override type OAuthAttemptF  [T] = IO[Either[InvalidOAuthReason, T]]
-    override type OAuthValidatedF[T] = IO[ValidatedNec[InvalidOAuthReason, T]]
-    override type TokenAttemptF  [T] = IO[Either[InvalidTokenReason, T]]
-    override type TokenValidatedF[T] = IO[ValidatedNec[InvalidTokenReason, T]]
+  given OAuthRepository[ConnectionIO, PostgresOAuthRepository] with
+    override type OAuthAttemptF  [T] = ConnectionIO[Either[InvalidOAuthReason, T]]
+    override type OAuthValidatedF[T] = ConnectionIO[ValidatedNec[InvalidOAuthReason, T]]
+    override type TokenAttemptF  [T] = ConnectionIO[Either[InvalidTokenReason, T]]
+    override type TokenValidatedF[T] = ConnectionIO[ValidatedNec[InvalidTokenReason, T]]
 
     extension (repository: PostgresOAuthRepository)
-      override def createTables(): IO[Unit] =
-        def impl(): ConnectionIO[Unit] =
-          for
-            _ ← repository.clientDataSource.createTable()
-            _ ← repository.appDataSource.createTable()
-            _ ← repository.tokenDataSource.createTable()
-            _ ← repository.tokenScopeDataSource.createTable()
-          yield ()
+      override def createTables(): ConnectionIO[Unit] =
+        for
+          _ ← repository.clientDataSource.createTable()
+          _ ← repository.appDataSource.createTable()
+          _ ← repository.tokenDataSource.createTable()
+          _ ← repository.tokenScopeDataSource.createTable()
+        yield ()
 
-        impl() transact repository.transactor
-
-      override def getClient(clientId: Long): IO[Option[ClientEntity]] =
+      override def getClient(clientId: Long): ConnectionIO[Option[ClientEntity]] =
         repository
           .clientDataSource
           .getClient(clientId)
-          .transact(repository.transactor)
 
       override def findClient(
         clientId:     Long,
         clientSecret: String
-      ): IO[Option[ClientEntity]] =
+      ): ConnectionIO[Option[ClientEntity]] =
         repository
           .clientDataSource
           .findClient(clientId, clientSecret)
-          .transact(repository.transactor)
 
-      override def getClientWithTokens(clientId: Long): IO[Option[Client]] =
-        def impl: ConnectionIO[Option[Client]] =
-          for
-            client       ← repository.clientDataSource.getClient(clientId)
-            accessTokens ← repository.getClientAccessTokensCIO(clientId)
-            refreshToken ← repository.tokenDataSource.getClientRefreshToken(clientId)
-          yield client map (Client(_, accessTokens, refreshToken))
-
-        impl transact repository.transactor
+      override def getClientWithTokens(clientId: Long): ConnectionIO[Option[Client]] =
+        for
+          client       ← repository.clientDataSource.getClient(clientId)
+          accessTokens ← repository.getClientAccessTokensCIO(clientId)
+          refreshToken ← repository.tokenDataSource.getClientRefreshToken(clientId)
+        yield client map (Client(_, accessTokens, refreshToken))
 
       override def isTokenValid(
         clientId:     Long,
         tokenValue:   String
-      ): IO[Either[InvalidTokenReason, Unit]] =
-        def impl: ConnectionIO[Either[InvalidTokenReason, Unit]] =
-          for
-            tokenRes ← repository.tokenDataSource.findToken(clientId, tokenValue)
-            isValid  ← tokenRes.map(repository.tokenDataSource.isTokenValid).sequence
-          yield isValid.flatten
-
-        impl transact repository.transactor
+      ): ConnectionIO[Either[InvalidTokenReason, Unit]] =
+        for
+          tokenRes ← repository.tokenDataSource.findToken(clientId, tokenValue)
+          isValid  ← tokenRes.map(repository.tokenDataSource.isTokenValid).sequence
+        yield isValid.flatten
 
       override def isClientExits(
         clientId:     Long,
         clientSecret: String
-      ): IO[Boolean] =
-        repository
-          .isClientExistsCIO(clientId, clientSecret)
-          .transact(repository.transactor)
+      ): ConnectionIO[Boolean] =
+        repository.isClientExistsCIO(clientId, clientSecret)
 
       override def insertClient(
         clientId:     Long,
         clientSecret: String
-      ): IO[Unit] =
+      ): ConnectionIO[Unit] =
         repository
           .clientDataSource
           .insertClient(clientId, clientSecret)
-          .transact(repository.transactor)
 
-      override def deleteClient(clientId: Long): IO[Unit] =
-        def impl(): ConnectionIO[Unit] =
-          for
-            _ ← repository.clientDataSource.deleteClient(clientId)
-            _ ← repository.appDataSource.deleteClientApps(clientId)
-            _ ← repository.deleteClientTokensWithScopesCIO(clientId)
-          yield ()
+      override def deleteClient(clientId: Long): ConnectionIO[Unit] =
+        for
+          _ ← repository.clientDataSource.deleteClient(clientId)
+          _ ← repository.appDataSource.deleteClientApps(clientId)
+          _ ← repository.deleteClientTokensWithScopesCIO(clientId)
+        yield ()
 
-        impl() transact repository.transactor
-
-      override def getClientApps(clientId: Long): IO[List[AppEntity]] =
+      override def getClientApps(clientId: Long): ConnectionIO[List[AppEntity]] =
         repository
           .appDataSource
           .getClientApps(clientId)
-          .transact(repository.transactor)
 
       override def getApp(
         appId:     Long,
         appSecret: String
-      ): IO[Option[AppEntity]] =
+      ): ConnectionIO[Option[AppEntity]] =
         repository
           .appDataSource
           .getApp(appId, appSecret)
-          .transact(repository.transactor)
 
       override def insertApp(
         appSecret:    String,
@@ -131,7 +108,7 @@ object PostgresOAuthRepository:
         appThumbnail: Option[String],
         callbackUrl:  Option[String],
         clientId:     Long,
-      ): IO[Long] =
+      ): ConnectionIO[Long] =
         repository
           .appDataSource
           .insertApp(
@@ -141,27 +118,23 @@ object PostgresOAuthRepository:
             callbackUrl  = callbackUrl,
             clientId     = clientId,
           )
-          .transact(repository.transactor)
 
       override def deleteApp(
         clientId:  Long,
         appId:     Long,
         appSecret: String
-      ): IO[Unit] =
-        def impl(): ConnectionIO[Unit] =
-          for
-            _ ← repository.deleteAppAccessTokenWithScopesCIO(clientId, appId, appSecret)
-            _ ← repository.appDataSource.deleteApp(appId)
-          yield ()
-
-        impl() transact repository.transactor
+      ): ConnectionIO[Unit] =
+        for
+          _ ← repository.deleteAppAccessTokenWithScopesCIO(clientId, appId, appSecret)
+          _ ← repository.appDataSource.deleteApp(appId)
+        yield ()
 
       override def updateApp(
         appId:           Long,
         newAppName:      String,
         newAppThumbnail: Option[String],
         newCallbackUrl:  Option[String],
-      ): IO[Unit] =
+      ): ConnectionIO[Unit] =
         repository
           .appDataSource
           .updateApp(
@@ -170,48 +143,41 @@ object PostgresOAuthRepository:
             newAppThumbnail = newAppThumbnail,
             newCallbackUrl  = newCallbackUrl
           )
-          .transact(repository.transactor)
 
-      override def getPlatformClientAccessToken(clientId: Long): IO[Option[AccessToken]] =
-        repository
-          .getPlatformClientAccessTokenCIO(clientId)
-          .transact(repository.transactor)
+      override def getPlatformClientAccessToken(clientId: Long): ConnectionIO[Option[AccessToken]] =
+        repository.getPlatformClientAccessTokenCIO(clientId)
 
       override def getAppAccessToken(
         clientId:  Long,
         appId:     Long,
         appSecret: String
-      ): IO[Option[AccessToken]] =
-        repository
-          .getAppAccessTokenCIO(clientId, appId, appSecret)
-          .transact(repository.transactor)
+      ): ConnectionIO[Option[AccessToken]] =
+        repository.getAppAccessTokenCIO(clientId, appId, appSecret)
 
       override def findToken(
         clientId:   Long,
         tokenValue: String
-      ): IO[Either[InvalidTokenReason, TokenEntity]] =
+      ): ConnectionIO[Either[InvalidTokenReason, TokenEntity]] =
         repository
           .tokenDataSource
           .findToken(clientId, tokenValue)
-          .transact(repository.transactor)
 
       override def retrieveToken(
         tokenValue: String
-      ): IO[Either[InvalidTokenReason, TokenEntity]] =
+      ): ConnectionIO[Either[InvalidTokenReason, TokenEntity]] =
         repository
           .tokenDataSource
           .retrieveToken(tokenValue)
-          .transact(repository.transactor)
 
       override def newAppAccessToken(
         refreshToken:     RefreshToken,
         accessTokenAppId: Long,
         lifeSeconds:      Option[Long],
         scopes:           List[TokenScope]
-      ): IO[Either[InvalidTokenReason, AccessToken]] =
+      ): ConnectionIO[Either[InvalidTokenReason, AccessToken]] =
         def impl(
           tokenValue: String
-        ): TokenAttemptCIO[AccessToken] =
+        ): TokenAttemptF[AccessToken] =
           for
             token ← repository.tokenDataSource.newAppAccessToken(
               refreshToken = refreshToken,
@@ -227,10 +193,7 @@ object PostgresOAuthRepository:
             )
           yield token map (t ⇒ AccessToken(entity = t, scopes = scopes))
 
-        for
-          tokenValueRes ← generateToken(tokenPrefix = f"$accessTokenAppId")
-          token         ← transactToken(tokenValueRes)(impl)
-        yield token
+        buildToken(tokenPrefix = f"$accessTokenAppId")(impl)
 
       override def newPlatformAccessToken(
         refreshToken:     RefreshToken,
@@ -239,7 +202,7 @@ object PostgresOAuthRepository:
       ): TokenAttemptF[AccessToken] =
         def impl(
           tokenValue: String
-        ): TokenAttemptCIO[AccessToken] =
+        ): TokenAttemptF[AccessToken] =
           for
             token ← repository.tokenDataSource.newPlatformAccessToken(
               refreshToken = refreshToken,
@@ -254,46 +217,34 @@ object PostgresOAuthRepository:
             )
           yield token map (t ⇒ AccessToken(entity = t, scopes = scopes))
 
-        for
-          tokenValueRes ← generateToken(tokenPrefix = f"${refreshToken.createdAt}")
-          token ← transactToken(tokenValueRes)(impl)
-        yield token
+        buildToken(tokenPrefix = f"${refreshToken.createdAt}")(impl)
 
       override def newRefreshToken(
         clientId:     Long,
         clientSecret: String
       ): TokenAttemptF[RefreshToken] =
-        def impl(tokenValue: String): TokenAttemptCIO[RefreshToken] =
+        def impl(tokenValue: String): TokenAttemptF[RefreshToken] =
           for token ← repository.tokenDataSource.newRefreshToken(
             clientId     = clientId,
             clientSecret = clientSecret,
             tokenValue   = tokenValue
           ) yield token
 
-        for
-          tokenValueRes ← generateToken(tokenPrefix = f"$clientId")
-          token         ← transactToken(tokenValueRes)(impl)
-        yield token
+        buildToken(tokenPrefix = f"$clientId")(impl)
 
       override def deleteAccessTokenWithScopes(
         clientId: Long,
         appId:    Option[Long],
-      ): IO[ValidatedNec[InvalidOAuthReason, Unit]] =
-        repository
-          .deleteAccessTokenWithScopesCIO(clientId, appId)
-          .transact(repository.transactor)
+      ): ConnectionIO[ValidatedNec[InvalidOAuthReason, Unit]] =
+        repository.deleteAccessTokenWithScopesCIO(clientId, appId)
 
-      override def deleteRefreshToken(clientId: Long): IO[Either[InvalidTokenReason, Unit]] =
-        repository
-          .deleteRefreshTokenCIO(clientId)
-          .transact(repository.transactor)
+      override def deleteRefreshToken(clientId: Long): ConnectionIO[Either[InvalidTokenReason, Unit]] =
+        repository.deleteRefreshTokenCIO(clientId)
 
       override def deleteClientTokensWithScopes(
         clientId: Long
-      ): IO[ValidatedNec[InvalidOAuthReason, Unit]] =
-        repository
-          .deleteClientTokensWithScopesCIO(clientId)
-          .transact(repository.transactor)
+      ): ConnectionIO[ValidatedNec[InvalidOAuthReason, Unit]] =
+        repository.deleteClientTokensWithScopesCIO(clientId)
 
       private def isClientExistsCIO(
         clientId:     Long,
@@ -358,7 +309,7 @@ object PostgresOAuthRepository:
               accessTokenAppId = appId
             )
 
-        def removeToken(): TokenAttemptCIO[Unit] =
+        def removeToken(): TokenAttemptF[Unit] =
           repository.tokenDataSource.deleteToken(
             clientId = clientId,
             appId    = appId,
@@ -373,7 +324,7 @@ object PostgresOAuthRepository:
           rmTokenVal:  ValidatedNec[InvalidOAuthReason, Unit] = rmTokenRes.toValidatedNec
         yield (rmScopesVal, rmTokenVal) mapN ((_, _) ⇒ ())
 
-      private def deleteClientTokensWithScopesCIO(clientId: Long): OAuthValidatedCIO[Unit] =
+      private def deleteClientTokensWithScopesCIO(clientId: Long): OAuthValidatedF[Unit] =
         for
           accessTokens  ← repository.getClientAccessTokensCIO(clientId)
           accessTokVal  ← deleteAccessTokensWithScopesCIO(clientId, accessTokens)
@@ -385,7 +336,7 @@ object PostgresOAuthRepository:
         clientId:  Long,
         appId:     Long,
         appSecret: String,
-      ): OAuthValidatedCIO[Unit] =
+      ): OAuthValidatedF[Unit] =
         for
           accessToken  ← repository.getAppAccessTokenCIO(clientId, appId, appSecret)
           accessTokens = accessToken map (List(_)) getOrElse Nil
@@ -395,7 +346,7 @@ object PostgresOAuthRepository:
       private def deleteAccessTokensWithScopesCIO(
         clientId: Long,
         tokens:   List[AccessToken]
-      ): OAuthValidatedCIO[Unit] =
+      ): OAuthValidatedF[Unit] =
         for
           removeVal ← tokens
             .map: tok ⇒
@@ -406,19 +357,25 @@ object PostgresOAuthRepository:
             .sequence
         yield removeVal.sequence map (_ ⇒ ())
 
-      private def deleteRefreshTokenCIO(clientId: Long): TokenAttemptCIO[Unit] =
+      private def deleteRefreshTokenCIO(clientId: Long): TokenAttemptF[Unit] =
         repository.tokenDataSource.deleteToken(
           clientId = clientId,
           appId    = None,
           status   = TokenStatus.Refresh.title
         )
 
-      private def transactToken[T](tokenValueRes: Either[Throwable, String])(
-        newToken: String ⇒ TokenAttemptCIO[T]
+      private def buildToken[T](tokenPrefix: String)(
+        newToken: String ⇒ ConnectionIO[Either[InvalidTokenReason, T]]
       ): TokenAttemptF[T] =
-        tokenValueRes
-          .map(newToken >>> (_ transact repository.transactor))
-          .sequence
-          .map:
-            _.sequence.flatMap:
-              _.left map (_ ⇒ InvalidTokenReason.GenerationError)
+        def impl(tokenValueRes: Either[Throwable, String]): TokenAttemptF[T] =
+          tokenValueRes
+            .map(newToken)
+            .sequence
+            .map:
+              _.sequence.flatMap:
+                _.left map (_ ⇒ InvalidTokenReason.GenerationError)
+
+        for
+          tokenValueRes ← generateToken[ConnectionIO](tokenPrefix)
+          token         ← impl(tokenValueRes)
+        yield token

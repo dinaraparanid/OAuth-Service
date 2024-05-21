@@ -9,6 +9,8 @@ import com.paranid5.auth_service.routing.*
 import com.paranid5.auth_service.routing.oauth.entity.RefreshRequest
 import com.paranid5.auth_service.routing.oauth.response.accessTokenRefreshed
 
+import doobie.syntax.all.*
+
 import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
 import org.http4s.dsl.io.*
 import org.http4s.{DecodeResult, Request, Response}
@@ -66,7 +68,10 @@ private def onPlatformRefresh(
 
     def retrieveRefreshToken(request: RefreshRequest): IO[Response[IO]] =
       for
-        tokenRes ← oauthRepository.findToken(clientId, request.token)
+        tokenRes ← oauthRepository
+          .findToken(clientId, request.token)
+          .transact(appModule.transcactor)
+
         response ← processRefreshToken(request.token, tokenRes)
       yield response
 
@@ -84,7 +89,7 @@ private def onPlatformRefresh(
         isValid ← oauthRepository.isTokenValid(
           clientId   = token.clientId,
           tokenValue = token.value
-        )
+        ).transact(appModule.transcactor)
 
         response ← isValid.fold(
           fa = invalidToken,
@@ -94,8 +99,14 @@ private def onPlatformRefresh(
 
     def generateAccessToken(refreshToken: TokenEntity): IO[Response[IO]] =
       for
-        _              ← oauthRepository.deletePlatformAccessTokenWithScopes(clientId)
-        accessTokenRes ← oauthRepository.newPlatformAccessToken(refreshToken)
+        _              ← oauthRepository
+          .deletePlatformAccessTokenWithScopes(clientId)
+          .transact(appModule.transcactor)
+
+        accessTokenRes ← oauthRepository
+          .newPlatformAccessToken(refreshToken)
+          .transact(appModule.transcactor)
+
         response ← accessTokenRes.fold(
           fa = x ⇒ somethingWentWrong,
           fb = t ⇒ accessTokenRefreshed(t.entity)

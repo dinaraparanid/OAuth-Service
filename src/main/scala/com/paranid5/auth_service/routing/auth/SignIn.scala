@@ -10,6 +10,8 @@ import com.paranid5.auth_service.routing.auth.response.userSignedIn
 
 import io.circe.syntax.*
 
+import doobie.syntax.all.*
+
 import org.http4s.circe.CirceEntityCodec.{circeEntityDecoder, circeEntityEncoder}
 import org.http4s.dsl.io.*
 import org.http4s.{DecodeResult, Request, Response}
@@ -58,7 +60,10 @@ private def onSignIn(query: Request[IO]): AppHttpResponse =
 
     def retrieveUserData(request: SignInRequest): IO[Response[IO]] =
       for
-        user     ← userRepository.getUserByEmailTransact(request.email)
+        user ← userRepository
+          .getUserByEmail(request.email)
+          .transact(appModule.transcactor)
+
         response ← processUserData(request.withEncodedPassword, user)
       yield response
 
@@ -80,8 +85,11 @@ private def onSignIn(query: Request[IO]): AppHttpResponse =
 
     def retrieveCredentials(foundUser: User): IO[Response[IO]] =
       for
-        clientOpt ← oauthRepository.getClient(foundUser.userId)
-        response  ← clientOpt.fold(
+        clientOpt ← oauthRepository
+          .getClient(foundUser.userId)
+          .transact(appModule.transcactor)
+
+        response ← clientOpt.fold(
           ifEmpty = somethingWentWrong)(
           f       = cred ⇒ userSignedIn(cred.clientId, cred.clientSecret)
         )

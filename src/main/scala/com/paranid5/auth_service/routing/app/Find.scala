@@ -5,6 +5,8 @@ import cats.data.Reader
 import com.paranid5.auth_service.routing.*
 import com.paranid5.auth_service.routing.app.response.*
 
+import doobie.syntax.all.*
+
 import org.http4s.dsl.io.*
 
 /**
@@ -42,7 +44,7 @@ private def onFind(
       appOpt ← oauthRepository.getApp(
         appId     = appId,
         appSecret = appSecret,
-      )
+      ).transact(appModule.transcactor)
 
       response ← appOpt.fold(ifEmpty = appNotFound)(f = appSuccessfullyFound)
     yield response

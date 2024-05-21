@@ -6,6 +6,8 @@ import cats.effect.IO
 import com.paranid5.auth_service.routing.*
 import com.paranid5.auth_service.routing.app.response.*
 
+import doobie.syntax.all.*
+
 import org.http4s.Response
 import org.http4s.dsl.io.*
 
@@ -37,7 +39,10 @@ private def onUpdate(
 
     def validateRequest(): IO[Response[IO]] =
       for
-        oldAppOpt ← oauthRepository.getApp(appId, appSecret)
+        oldAppOpt ← oauthRepository
+          .getApp(appId, appSecret)
+          .transact(appModule.transcactor)
+
         response  ← oldAppOpt.fold(
           ifEmpty = appNotFound)(
           f       = _ ⇒ if appName.isEmpty then appNameMustNotBeEmpty else updateApp()
@@ -51,7 +56,7 @@ private def onUpdate(
           newAppName      = appName,
           newAppThumbnail = appThumbnail,
           newCallbackUrl  = redirectUrl,
-        )
+        ).transact(appModule.transcactor)
 
         response ← appSuccessfullyUpdated
       yield response

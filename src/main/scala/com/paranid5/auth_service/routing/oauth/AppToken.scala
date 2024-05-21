@@ -11,6 +11,8 @@ import com.paranid5.auth_service.routing.auth.entity.{SignInRequest, matches}
 import com.paranid5.auth_service.routing.oauth.entity.TokenResponse
 import com.paranid5.auth_service.routing.oauth.response.tokensGenerated
 
+import doobie.syntax.all.*
+
 import io.circe.syntax.*
 
 import org.http4s.circe.CirceEntityCodec.{circeEntityDecoder, circeEntityEncoder}
@@ -70,7 +72,10 @@ private def onAppToken(
 
     def retrieveCredentials: IO[Response[IO]] =
       for
-        clientOpt ← oauthRepository.findClient(clientId, clientSecret)
+        clientOpt ← oauthRepository
+          .findClient(clientId, clientSecret)
+          .transact(appModule.transcactor)
+
         response  ← clientOpt.fold(
           ifEmpty = clientNotFound)(
           f       = retrieveApp
@@ -79,7 +84,10 @@ private def onAppToken(
 
     def retrieveApp(client: ClientEntity): IO[Response[IO]] =
       for
-        app      ← oauthRepository.getApp(appId, appSecret)
+        app ← oauthRepository
+          .getApp(appId, appSecret)
+          .transact(appModule.transcactor)
+
         response ← app.fold(
           ifEmpty = appNotFound)(
           f       = removeOldTokens(client, _)
@@ -91,12 +99,14 @@ private def onAppToken(
       app:    AppEntity,
     ): IO[Response[IO]] =
       for
-        _ ← oauthRepository.deleteRefreshToken(client.clientId)
+        _ ← oauthRepository
+          .deleteRefreshToken(client.clientId)
+          .transact(appModule.transcactor)
 
         _ ← oauthRepository.deleteAccessTokenWithScopes(
           clientId = client.clientId,
           appId    = Option(appId)
-        )
+        ).transact(appModule.transcactor)
 
         response ← generateRefreshToken(client, app)
       yield response
@@ -109,7 +119,7 @@ private def onAppToken(
         refreshTokenRes ← oauthRepository.newRefreshToken(
           clientId     = client.clientId,
           clientSecret = client.clientSecret
-        )
+        ).transact(appModule.transcactor)
 
         response ← refreshTokenRes.fold(
           fa = _ ⇒ somethingWentWrong,
@@ -128,7 +138,7 @@ private def onAppToken(
         accessTokenRes ← oauthRepository.newAppAccessToken(
           refreshToken     = refreshToken,
           accessTokenAppId = appId,
-        )
+        ).transact(appModule.transcactor)
 
         response ← accessTokenRes.fold(
           fa = _ ⇒ somethingWentWrong,

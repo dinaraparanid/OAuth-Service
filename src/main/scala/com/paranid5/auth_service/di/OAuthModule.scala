@@ -10,7 +10,6 @@ final class OAuthModule(transactor: IOTransactor):
   private lazy val tokenModule:  OAuthTokenModule  = OAuthTokenModule()
 
   lazy val oauthRepository: PostgresOAuthRepository = PostgresOAuthRepository(
-    transactor           = transactor,
     clientDataSource     = clientModule.clientDataSource,
     appDataSource        = clientModule.appDataSource,
     tokenDataSource      = tokenModule.tokenDataSource,

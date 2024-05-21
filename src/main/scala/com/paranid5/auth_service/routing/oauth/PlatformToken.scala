@@ -11,6 +11,8 @@ import com.paranid5.auth_service.routing.auth.entity.{SignInRequest, matches}
 import com.paranid5.auth_service.routing.oauth.entity.TokenResponse
 import com.paranid5.auth_service.routing.oauth.response.tokensGenerated
 
+import doobie.syntax.all.*
+
 import io.circe.syntax.*
 
 import org.http4s.circe.CirceEntityCodec.{circeEntityDecoder, circeEntityEncoder}
@@ -66,7 +68,10 @@ private def onPlatformToken(
 
     def retrieveCredentials: IO[Response[IO]] =
       for
-        clientOpt ← oauthRepository.findClient(clientId, clientSecret)
+        clientOpt ← oauthRepository
+          .findClient(clientId, clientSecret)
+          .transact(appModule.transcactor)
+
         response  ← clientOpt.fold(
           ifEmpty = clientNotFound)(
           f       = removeOldTokens
@@ -76,8 +81,14 @@ private def onPlatformToken(
     def removeOldTokens(client: ClientEntity): IO[Response[IO]] =
       println(client)
       for
-        _        ← oauthRepository.deleteRefreshToken(client.clientId)
-        _        ← oauthRepository.deletePlatformAccessTokenWithScopes(client.clientId)
+        _ ← oauthRepository
+          .deleteRefreshToken(client.clientId)
+          .transact(appModule.transcactor)
+
+        _ ← oauthRepository
+          .deletePlatformAccessTokenWithScopes(client.clientId)
+          .transact(appModule.transcactor)
+
         response ← generateRefreshToken(client)
       yield response
 
@@ -86,7 +97,7 @@ private def onPlatformToken(
         refreshTokenRes ← oauthRepository.newRefreshToken(
           clientId     = client.clientId,
           clientSecret = client.clientSecret
-        )
+        ).transact(appModule.transcactor)
 
         response ← refreshTokenRes.fold(
           fa = _ ⇒ somethingWentWrong,
@@ -96,7 +107,9 @@ private def onPlatformToken(
 
     def generateAccessToken(refreshToken: TokenEntity): IO[Response[IO]] =
       for
-        accessTokenRes ← oauthRepository.newPlatformAccessToken(refreshToken)
+        accessTokenRes ← oauthRepository
+          .newPlatformAccessToken(refreshToken)
+          .transact(appModule.transcactor)
 
         response ← accessTokenRes.fold(
           fa = _ ⇒ somethingWentWrong,

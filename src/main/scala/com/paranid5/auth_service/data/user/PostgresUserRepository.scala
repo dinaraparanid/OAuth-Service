@@ -6,7 +6,6 @@ import com.paranid5.auth_service.data.user.entity.User
 import doobie.free.connection.ConnectionIO
 
 final class PostgresUserRepository(
-  private val transactor:     IOTransactor,
   private val userDataSource: PostgresUserDataSource
 )
 
@@ -56,8 +55,3 @@ object PostgresUserRepository:
         repository
           .userDataSource
           .deleteUser(userId)
-
-  given UserTransactions[PostgresUserRepository] with
-    extension (repository: PostgresUserRepository)
-      override protected def transactor: IOTransactor =
-        repository.transactor
