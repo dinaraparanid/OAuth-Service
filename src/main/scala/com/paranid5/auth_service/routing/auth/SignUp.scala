@@ -2,13 +2,13 @@ package com.paranid5.auth_service.routing.auth
 
 import cats.data.Reader
 import cats.effect.IO
-import cats.syntax.all.*
 
 import com.paranid5.auth_service.data.user.entity.User
 import com.paranid5.auth_service.domain.generateSecret
 import com.paranid5.auth_service.routing.*
 import com.paranid5.auth_service.routing.auth.entity.SignUpRequest
 import com.paranid5.auth_service.routing.auth.response.userSuccessfullyRegistered
+import com.paranid5.auth_service.utills.extensions.*
 
 import doobie.free.connection.ConnectionIO
 
@@ -66,11 +66,10 @@ private def onSignUp(query: Request[IO]): AppHttpResponse =
       foundUser:       Option[User],
       encodedUserData: SignUpRequest,
     ): ConnectionIO[IO[Response[IO]]] =
-      foundUser
-        .toLeft(())
-        .map(_ ⇒ addNewUser(encodedUserData))
-        .sequence
-        .map(_ getOrElse userAlreadyRegistered)
+      foundUser.unwrapSequencedL(
+        ifEmpty = addNewUser(encodedUserData))(
+        f       = _ ⇒ userAlreadyRegistered
+      )
 
     def addNewUser(encodedUserData: SignUpRequest): ConnectionIO[IO[Response[IO]]] =
       for
@@ -85,15 +84,15 @@ private def onSignUp(query: Request[IO]): AppHttpResponse =
       yield response
 
     def processGeneratedCredentials(
-      clientId:     Long,
-      clientSecret: Either[Throwable, String]
+      clientId:        Long,
+      clientSecretRes: Either[Throwable, String]
     ): ConnectionIO[IO[Response[IO]]] =
-      clientSecret
-        .map: clientSecret ⇒
+      clientSecretRes.foldSequencedR(
+        fa = _ ⇒ credentialsGenerationError)(
+        fb = clientSecret ⇒
           oauthRepository
             .insertClient(clientId, clientSecret)
             .map(_ ⇒ userSuccessfullyRegistered(clientId, clientSecret))
-        .sequence
-        .map(_ getOrElse credentialsGenerationError)
+      )
 
     processRequest(query.attemptAs[SignUpRequest])(retrieveUserData) run appModule

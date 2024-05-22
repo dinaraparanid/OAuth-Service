@@ -2,14 +2,13 @@ package com.paranid5.auth_service.routing.oauth
 
 import cats.data.Reader
 import cats.effect.IO
-
+import cats.syntax.all.*
 import com.paranid5.auth_service.data.oauth.client.entity.AppEntity
 import com.paranid5.auth_service.data.oauth.token.entity.AccessToken
 import com.paranid5.auth_service.routing.*
 import com.paranid5.auth_service.routing.oauth.entity.AuthorizeRequest
-
+import doobie.free.connection.ConnectionIO
 import doobie.syntax.all.*
-
 import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
 import org.http4s.{DecodeResult, Request, Response}
 
@@ -23,7 +22,7 @@ import org.http4s.{DecodeResult, Request, Response}
  * ==Body==
  * {{{
  *   {
- *     "token": "abcdef" // 45-th length string
+ *     "token": "abcdef"
  *   }
  * }}}
  *
@@ -50,41 +49,28 @@ private def onAppAuthorize(
   Reader: appModule ⇒
     val oauthRepository = appModule.oauthModule.oauthRepository
 
-    def processRequest(requestRes: DecodeResult[IO, AuthorizeRequest]): IO[Response[IO]] =
+    def retrieveApp(request: AuthorizeRequest): ConnectionIO[IO[Response[IO]]] =
       for
-        responseIO ← requestRes.fold(_ ⇒ invalidBody, retrieveApp)
-        response   ← responseIO
-      yield response
-
-    def retrieveApp(request: AuthorizeRequest): IO[Response[IO]] =
-      for
-        appOpt ← oauthRepository
-          .getApp(appId, appSecret)
-          .transact(appModule.transcactor)
-
+        appOpt   ← oauthRepository.getApp(appId, appSecret)
         response ← processApp(request.token, appOpt)
       yield response
 
     def processApp(
       requestToken: String,
-      appOpt: Option[AppEntity]
-    ): IO[Response[IO]] =
-      for
-        response ← appOpt.fold(
-          ifEmpty = appNotFound)(
-          f       = app ⇒ retrieveToken(requestToken, app)
-        )
-      yield response
+      appOpt:       Option[AppEntity]
+    ): ConnectionIO[IO[Response[IO]]] =
+      appOpt
+        .toRight(())
+        .map(retrieveToken(requestToken, _))
+        .sequence
+        .map(_ getOrElse appNotFound)
 
     def retrieveToken(
       requestToken: String,
       app:          AppEntity
-    ): IO[Response[IO]] =
+    ): ConnectionIO[IO[Response[IO]]] =
       for
-        tokenOpt    ← oauthRepository
-          .getAppAccessToken(clientId, appId, appSecret)
-          .transact(appModule.transcactor)
-
+        tokenOpt    ← oauthRepository.getAppAccessToken(clientId, appId, appSecret)
         callbackUrl = app.callbackUrl getOrElse (redirectUrl getOrElse DefaultRedirect)
         response    ← processToken(callbackUrl, requestToken, tokenOpt)
       yield response
@@ -93,26 +79,23 @@ private def onAppAuthorize(
       callbackUrl:       String,
       requestToken:      String,
       retrievedTokenOpt: Option[AccessToken]
-    ): IO[Response[IO]] =
-      retrievedTokenOpt.fold(
-        ifEmpty = tokenNotFound)(
-        f       = token ⇒ validateToken(callbackUrl, token)
-      )
+    ): ConnectionIO[IO[Response[IO]]] =
+      retrievedTokenOpt
+        .toRight(())
+        .map(validateToken(callbackUrl, _))
+        .sequence
+        .map(_ getOrElse tokenNotFound)
 
     def validateToken(
       callbackUrl: String,
       token:       AccessToken
-    ): IO[Response[IO]] =
-      for
-        isValid ← oauthRepository.isTokenValid(
-          clientId   = token.entity.clientId,
-          tokenValue = token.entity.value
-        ).transact(appModule.transcactor)
+    ): ConnectionIO[IO[Response[IO]]] =
+      for isValid ← oauthRepository.isTokenValid(
+        clientId   = token.entity.clientId,
+        tokenValue = token.entity.value
+      ) yield isValid.fold(
+        fa = invalidToken,
+        fb = _ ⇒ redirectToCallbackUrl(callbackUrl)
+      )
 
-        response ← isValid.fold(
-          fa = invalidToken,
-          fb = _ ⇒ redirectToCallbackUrl(callbackUrl)
-        )
-      yield response
-
-    processRequest(query.attemptAs[AuthorizeRequest])
+    processRequest(query.attemptAs[AuthorizeRequest])(retrieveApp) run appModule
