@@ -2,19 +2,18 @@ package com.paranid5.auth_service.routing.auth
 
 import cats.data.Reader
 import cats.effect.IO
+import cats.syntax.all.*
 
 import com.paranid5.auth_service.data.user.entity.User
 import com.paranid5.auth_service.routing.*
-import com.paranid5.auth_service.routing.auth.entity.{SignInRequest, SignInResponse, matches}
+import com.paranid5.auth_service.routing.auth.entity.{SignInRequest, matches}
 import com.paranid5.auth_service.routing.auth.response.userSignedIn
 
-import io.circe.syntax.*
+import doobie.free.connection.ConnectionIO
 
-import doobie.syntax.all.*
-
-import org.http4s.circe.CirceEntityCodec.{circeEntityDecoder, circeEntityEncoder}
+import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
 import org.http4s.dsl.io.*
-import org.http4s.{DecodeResult, Request, Response}
+import org.http4s.{Request, Response}
 
 /**
  * Sign in on platform (e.g. to manage user apps).
@@ -42,7 +41,7 @@ import org.http4s.{DecodeResult, Request, Response}
  * {{{
  *   {
  *     "client_id":     123,
- *     "client_secret": "abcdefghij" // 10-th length string
+ *     "client_secret": "abcdefghij"
  *   }
  * }}}
  */
@@ -52,47 +51,37 @@ private def onSignIn(query: Request[IO]): AppHttpResponse =
     val userRepository  = appModule.userModule.userRepository
     val oauthRepository = appModule.oauthModule.oauthRepository
 
-    def processRequest(requestRes: DecodeResult[IO, SignInRequest]): IO[Response[IO]] =
+    def retrieveUserData(request: SignInRequest): ConnectionIO[IO[Response[IO]]] =
       for
-        responseIO ← requestRes.fold(_ ⇒ invalidBody, retrieveUserData)
-        response   ← responseIO
-      yield response
-
-    def retrieveUserData(request: SignInRequest): IO[Response[IO]] =
-      for
-        user ← userRepository
-          .getUserByEmail(request.email)
-          .transact(appModule.transcactor)
-
+        user     ← userRepository.getUserByEmail(request.email)
         response ← processUserData(request.withEncodedPassword, user)
       yield response
 
     def processUserData(
       request:   SignInRequest,
       foundUser: Option[User]
-    ): IO[Response[IO]] =
-      foundUser.fold(
-        ifEmpty = wrongEmail)(
-        f       = validateUser(request, _)
-      )
+    ): ConnectionIO[IO[Response[IO]]] =
+      foundUser
+        .toRight(())
+        .map(validateUser(request, _))
+        .sequence
+        .map(_ getOrElse wrongEmail)
 
     def validateUser(
       request:   SignInRequest,
       foundUser: User
-    ): IO[Response[IO]] =
-      if request matches foundUser then retrieveCredentials(foundUser)
-      else wrongPassword
+    ): ConnectionIO[IO[Response[IO]]] =
+      def impl: Either[Unit, ConnectionIO[IO[Response[IO]]]] =
+        if request matches foundUser then Right(retrieveCredentials(foundUser))
+        else Left(())
 
-    def retrieveCredentials(foundUser: User): IO[Response[IO]] =
-      for
-        clientOpt ← oauthRepository
-          .getClient(foundUser.userId)
-          .transact(appModule.transcactor)
+      impl.sequence map (_ getOrElse wrongPassword)
 
-        response ← clientOpt.fold(
+    def retrieveCredentials(foundUser: User): ConnectionIO[IO[Response[IO]]] =
+      for clientOpt ← oauthRepository.getClient(foundUser.userId)
+        yield clientOpt.fold(
           ifEmpty = somethingWentWrong)(
           f       = cred ⇒ userSignedIn(cred.clientId, cred.clientSecret)
         )
-      yield response
 
-    processRequest(query.attemptAs[SignInRequest])
+    processRequest(query.attemptAs[SignInRequest])(retrieveUserData) run appModule

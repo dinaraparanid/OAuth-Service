@@ -2,7 +2,6 @@ package com.paranid5.auth_service.routing.auth
 
 import cats.data.Reader
 import cats.effect.IO
-import cats.free.Free
 import cats.syntax.all.*
 
 import com.paranid5.auth_service.data.user.entity.User
@@ -12,11 +11,10 @@ import com.paranid5.auth_service.routing.auth.entity.SignUpRequest
 import com.paranid5.auth_service.routing.auth.response.userSuccessfullyRegistered
 
 import doobie.free.connection.ConnectionIO
-import doobie.syntax.all.*
 
 import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
 import org.http4s.dsl.io.*
-import org.http4s.{DecodeResult, Request, Response}
+import org.http4s.{Request, Response}
 
 /**
  * Sign up on platform (e.g. to manage user apps).
@@ -46,7 +44,7 @@ import org.http4s.{DecodeResult, Request, Response}
  * {{{
  *   {
  *     "client_id":     123,
- *     "client_secret": "abcdefghij" // 10-th length string
+ *     "client_secret": "abcdefghij"
  *   }
  * }}}
  */
@@ -55,17 +53,6 @@ private def onSignUp(query: Request[IO]): AppHttpResponse =
   Reader: appModule ⇒
     val userRepository  = appModule.userModule.userRepository
     val oauthRepository = appModule.oauthModule.oauthRepository
-
-    def processRequest(requestRes: DecodeResult[IO, SignUpRequest]): IO[Response[IO]] =
-      requestRes
-        .fold(fa = Left(_), fb = x ⇒ Right(retrieveUserData(x)))
-        .map: res ⇒
-          res
-            .sequence
-            .map(_ getOrElse invalidBody)
-            .transact(appModule.transcactor)
-        .flatten
-        .flatten
 
     def retrieveUserData(request: SignUpRequest): ConnectionIO[IO[Response[IO]]] =
       val encodedRequest = request.withEncodedPassword
@@ -109,4 +96,4 @@ private def onSignUp(query: Request[IO]): AppHttpResponse =
         .sequence
         .map(_ getOrElse credentialsGenerationError)
 
-    processRequest(query.attemptAs[SignUpRequest])
+    processRequest(query.attemptAs[SignUpRequest])(retrieveUserData) run appModule
