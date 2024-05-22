@@ -5,8 +5,10 @@ import cats.effect.IO
 
 import com.paranid5.auth_service.routing.*
 import com.paranid5.auth_service.routing.app.response.*
+import com.paranid5.auth_service.utills.extensions.ApplicativeOptionOps.foldTraverseR
+import com.paranid5.auth_service.utills.extensions.flatTransact
 
-import doobie.syntax.all.*
+import doobie.free.connection.ConnectionIO
 
 import org.http4s.Response
 import org.http4s.dsl.io.*
@@ -34,24 +36,17 @@ private def onDelete(
   Reader: appModule ⇒
     val oauthRepository = appModule.oauthModule.oauthRepository
 
-    def validateRequest(): IO[Response[IO]] =
+    def validateRequest(): ConnectionIO[IO[Response[IO]]] =
       for
-        appOpt ← oauthRepository
-          .getApp(appId, appSecret)
-          .transact(appModule.transcactor)
-
-        response ← appOpt.fold(ifEmpty = appNotFound)(_ ⇒ deleteApp())
+        appOpt   ← oauthRepository.getApp(appId, appSecret)
+        response ← appOpt.foldTraverseR(ifEmpty = appNotFound)(_ ⇒ deleteApp())
       yield response
 
-    def deleteApp(): IO[Response[IO]] =
-      for
-        _ ← oauthRepository.deleteApp(
-          clientId  = clientId,
-          appId     = appId,
-          appSecret = appSecret,
-        ).transact(appModule.transcactor)
+    def deleteApp(): ConnectionIO[IO[Response[IO]]] =
+      for _ ← oauthRepository.deleteApp(
+        clientId  = clientId,
+        appId     = appId,
+        appSecret = appSecret,
+      ) yield appSuccessfullyDeleted
 
-        response ← appSuccessfullyDeleted
-      yield response
-
-    validateRequest()
+    validateRequest() flatTransact appModule.transcactor

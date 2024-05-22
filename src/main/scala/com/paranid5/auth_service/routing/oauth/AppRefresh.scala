@@ -5,15 +5,17 @@ import cats.effect.IO
 
 import com.paranid5.auth_service.data.oauth.token.entity.TokenEntity
 import com.paranid5.auth_service.data.oauth.token.error.InvalidTokenReason
+import com.paranid5.auth_service.routing.*
 import com.paranid5.auth_service.routing.oauth.entity.RefreshRequest
 import com.paranid5.auth_service.routing.oauth.response.accessTokenRefreshed
-import com.paranid5.auth_service.routing.*
+import com.paranid5.auth_service.utills.extensions.ApplicativeEitherOps.foldTraverseR
+import com.paranid5.auth_service.utills.extensions.ApplicativeOptionOps.foldTraverseR
 
-import doobie.syntax.all.*
+import doobie.free.connection.ConnectionIO
 
-import org.http4s.dsl.io.*
 import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
-import org.http4s.{DecodeResult, Request, Response}
+import org.http4s.dsl.io.*
+import org.http4s.{Request, Response}
 
 /**
  * Validates access token for authorization for platform.
@@ -64,47 +66,38 @@ private def onAppRefresh(
   Reader: appModule ⇒
     val oauthRepository = appModule.oauthModule.oauthRepository
 
-    def processRequest(requestRes: DecodeResult[IO, RefreshRequest]): IO[Response[IO]] =
+    def retrieveRefreshToken(request: RefreshRequest): ConnectionIO[IO[Response[IO]]] =
       for
-        responseIO ← requestRes.fold(_ ⇒ invalidBody, retrieveRefreshToken)
-        response   ← responseIO
-      yield response
-
-    def retrieveRefreshToken(request: RefreshRequest): IO[Response[IO]] =
-      for
-        tokenRes ← oauthRepository.findToken(clientId, request.token).transact(appModule.transcactor)
+        tokenRes ← oauthRepository.findToken(clientId, request.token)
         response ← processRefreshToken(request.token, tokenRes)
       yield response
 
     def processRefreshToken(
       requestToken:      String,
       retrievedTokenOpt: Either[InvalidTokenReason, TokenEntity]
-    ): IO[Response[IO]] =
-      retrievedTokenOpt.fold(
-        fa = _ ⇒ tokenNotFound,
-        fb = token ⇒ validateRefreshToken(token)
+    ): ConnectionIO[IO[Response[IO]]] =
+      retrievedTokenOpt.foldTraverseR(
+        fa = _ ⇒ tokenNotFound)(
+        fb = validateRefreshToken
       )
 
-    def validateRefreshToken(token: TokenEntity): IO[Response[IO]] =
+    def validateRefreshToken(token: TokenEntity): ConnectionIO[IO[Response[IO]]] =
       for
         isValid ← oauthRepository.isTokenValid(
           clientId   = token.clientId,
           tokenValue = token.value
-        ).transact(appModule.transcactor)
+        )
 
-        response ← isValid.fold(
-          fa = invalidToken,
+        response ← isValid.foldTraverseR(
+          fa = invalidToken)(
           fb = _ ⇒ retrieveApp(token)
         )
       yield response
 
-    def retrieveApp(refreshToken: TokenEntity): IO[Response[IO]] =
+    def retrieveApp(refreshToken: TokenEntity): ConnectionIO[IO[Response[IO]]] =
       for
-        appOpt ← oauthRepository
-          .getApp(appId, appSecret)
-          .transact(appModule.transcactor)
-
-        response ← appOpt.fold(
+        appOpt   ← oauthRepository.getApp(appId, appSecret)
+        response ← appOpt.foldTraverseR(
           ifEmpty = appNotFound)(
           f       = _ ⇒ generateAccessToken(refreshToken, appId)
         )
@@ -113,16 +106,11 @@ private def onAppRefresh(
     def generateAccessToken(
       refreshToken: TokenEntity,
       appId:        Long,
-    ): IO[Response[IO]] =
-      for
-        accessTokenRes ← oauthRepository
-          .newAppAccessToken(refreshToken, appId)
-          .transact(appModule.transcactor)
-
-        response ← accessTokenRes.fold(
+    ): ConnectionIO[IO[Response[IO]]] =
+      for accessTokenRes ← oauthRepository.newAppAccessToken(refreshToken, appId)
+        yield accessTokenRes.fold(
           fa = _ ⇒ somethingWentWrong,
           fb = t ⇒ accessTokenRefreshed(t.entity)
         )
-      yield response
 
-    processRequest(query.attemptAs[RefreshRequest])
+    processRequest(query.attemptAs[RefreshRequest])(retrieveRefreshToken) run appModule

@@ -4,14 +4,15 @@ import cats.data.Reader
 import cats.effect.IO
 
 import com.paranid5.auth_service.data.oauth.token.entity.AccessToken
-import com.paranid5.auth_service.routing.oauth.entity.AuthorizeRequest
 import com.paranid5.auth_service.routing.*
+import com.paranid5.auth_service.routing.oauth.entity.AuthorizeRequest
+import com.paranid5.auth_service.utills.extensions.ApplicativeOptionOps.foldTraverseR
 
-import doobie.syntax.all.*
+import doobie.free.connection.ConnectionIO
 
 import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
 import org.http4s.dsl.io.*
-import org.http4s.{DecodeResult, Request, Response}
+import org.http4s.{Request, Response}
 
 /**
  * Validates access token for authorization for platform.
@@ -23,7 +24,7 @@ import org.http4s.{DecodeResult, Request, Response}
  * ==Body==
  * {{{
  *   {
- *     "token": "abcdef" // 45-th length string
+ *     "token": "abcdef"
  *   }
  * }}}
  *
@@ -46,41 +47,28 @@ private def onPlatformAuthorize(
   Reader: appModule ⇒
     val oauthRepository = appModule.oauthModule.oauthRepository
 
-    def processRequest(requestRes: DecodeResult[IO, AuthorizeRequest]): IO[Response[IO]] =
+    def retrieveToken(request: AuthorizeRequest): ConnectionIO[IO[Response[IO]]] =
       for
-        responseIO ← requestRes.fold(_ ⇒ invalidBody, retrieveToken)
-        response   ← responseIO
-      yield response
-
-    def retrieveToken(request: AuthorizeRequest): IO[Response[IO]] =
-      for
-        tokenOpt ← oauthRepository
-          .getPlatformClientAccessToken(clientId)
-          .transact(appModule.transcactor)
-
+        tokenOpt ← oauthRepository.getPlatformClientAccessToken(clientId)
         response ← processToken(request.token, tokenOpt)
       yield response
 
     def processToken(
       requestToken:      String,
       retrievedTokenOpt: Option[AccessToken]
-    ): IO[Response[IO]] =
-      retrievedTokenOpt.fold(
+    ): ConnectionIO[IO[Response[IO]]] =
+      retrievedTokenOpt.foldTraverseR(
         ifEmpty = tokenNotFound)(
-        f       = token ⇒ validateToken(token)
+        f       = validateToken
       )
 
-    def validateToken(token: AccessToken): IO[Response[IO]] =
-      for
-        isValid ← oauthRepository.isTokenValid(
-          clientId   = token.entity.clientId,
-          tokenValue = token.entity.value
-        ).transact(appModule.transcactor)
+    def validateToken(token: AccessToken): ConnectionIO[IO[Response[IO]]] =
+      for isValid ← oauthRepository.isTokenValid(
+        clientId   = token.entity.clientId,
+        tokenValue = token.entity.value
+      ) yield isValid.fold(
+        fa = invalidToken,
+        fb = _ ⇒ redirectToCallbackUrl(redirectUrl getOrElse DefaultRedirect)
+      )
 
-        response ← isValid.fold(
-          fa = invalidToken,
-          fb = _ ⇒ redirectToCallbackUrl(redirectUrl getOrElse DefaultRedirect)
-        )
-      yield response
-
-    processRequest(query.attemptAs[AuthorizeRequest])
+    processRequest(query.attemptAs[AuthorizeRequest])(retrieveToken) run appModule

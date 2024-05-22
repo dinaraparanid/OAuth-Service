@@ -1,12 +1,15 @@
 package com.paranid5.auth_service.routing.app
 
 import cats.data.Reader
+import cats.effect.IO
 
 import com.paranid5.auth_service.routing.*
 import com.paranid5.auth_service.routing.app.response.*
+import com.paranid5.auth_service.utills.extensions.flatTransact
 
-import doobie.syntax.all.*
+import doobie.free.connection.ConnectionIO
 
+import org.http4s.Response
 import org.http4s.dsl.io.*
 
 /**
@@ -40,11 +43,13 @@ private def onFind(
   Reader: appModule ⇒
     val oauthRepository = appModule.oauthModule.oauthRepository
 
-    for
-      appOpt ← oauthRepository.getApp(
-        appId     = appId,
+    def impl: ConnectionIO[IO[Response[IO]]] =
+      for appOpt ← oauthRepository.getApp(
+        appId = appId,
         appSecret = appSecret,
-      ).transact(appModule.transcactor)
+      ) yield appOpt.fold(
+        ifEmpty = appNotFound)(
+        f       = appSuccessfullyFound
+      )
 
-      response ← appOpt.fold(ifEmpty = appNotFound)(f = appSuccessfullyFound)
-    yield response
+    impl flatTransact appModule.transcactor

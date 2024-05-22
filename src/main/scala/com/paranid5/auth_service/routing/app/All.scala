@@ -4,14 +4,13 @@ import cats.data.Reader
 import cats.effect.IO
 
 import com.paranid5.auth_service.routing.*
-import com.paranid5.auth_service.routing.app.entity.AllRequest
 import com.paranid5.auth_service.routing.app.response.*
+import com.paranid5.auth_service.utills.extensions.flatTransact
 
-import doobie.syntax.all.*
+import doobie.free.connection.ConnectionIO
 
-import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
+import org.http4s.Response
 import org.http4s.dsl.io.*
-import org.http4s.{DecodeResult, Request, Response}
 
 /**
  * Retrieves all applications' info by client's credentials
@@ -41,10 +40,8 @@ private def onAll(clientId: Long): AppHttpResponse =
   Reader: appModule ⇒
     val oauthRepository = appModule.oauthModule.oauthRepository
 
-    for
-      apps ← oauthRepository
-        .getClientApps(clientId)
-        .transact(appModule.transcactor)
+    def response: ConnectionIO[IO[Response[IO]]] =
+      for apps ← oauthRepository.getClientApps(clientId)
+        yield clientApps(apps)
 
-      response ← clientApps(apps)
-    yield response
+    response flatTransact appModule.transcactor

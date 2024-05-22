@@ -4,13 +4,18 @@ import cats.data.Reader
 import cats.effect.IO
 import cats.syntax.all.*
 
+import com.paranid5.auth_service.data.oauth.client.entity.ClientEntity
 import com.paranid5.auth_service.data.oauth.token.entity.TokenEntity
+import com.paranid5.auth_service.data.user.entity.User
 import com.paranid5.auth_service.routing.*
 import com.paranid5.auth_service.routing.oauth.response.userMetadata
+import com.paranid5.auth_service.utills.extensions.ApplicativeEitherOps.foldTraverseR
+import com.paranid5.auth_service.utills.extensions.flatTransact
+
+import doobie.free.connection.ConnectionIO
+
 import org.http4s.Response
 import org.http4s.dsl.io.*
-
-import doobie.syntax.all.*
 
 /**
  * Retrieves user metadata by access token.
@@ -41,30 +46,23 @@ private def onFindUser(accessToken: String): AppHttpResponse =
     val userRepository  = appModule.userModule.userRepository
     val oauthRepository = appModule.oauthModule.oauthRepository
 
-    def validateRequest(): IO[Response[IO]] =
+    def validateRequest(): ConnectionIO[IO[Response[IO]]] =
       for
-        tokenRes ← oauthRepository
-          .retrieveToken(accessToken)
-          .transact(appModule.transcactor)
-
-        response ← tokenRes.fold(_ ⇒ tokenNotFound, retrieveUser)
+        tokenRes ← oauthRepository.retrieveToken(accessToken)
+        response ← tokenRes.foldTraverseR(_ ⇒ tokenNotFound)(retrieveUser)
       yield response
 
-    def retrieveUser(token: TokenEntity): IO[Response[IO]] =
-      for
-        userOpt       ← userRepository
-          .getUser(userId = token.clientId)
-          .transact(appModule.transcactor)
-
-        clientOpt     ← oauthRepository
-          .getClient(clientId = token.clientId)
-          .transact(appModule.transcactor)
-
-        userClientOpt = (userOpt, clientOpt) mapN ((user, client) ⇒ (user, client))
-        response      ← userClientOpt.fold(
+    def retrieveUser(token: TokenEntity): ConnectionIO[IO[Response[IO]]] =
+      def response(userClientOpt: Option[(User, ClientEntity)]): IO[Response[IO]] =
+        userClientOpt.fold(
           ifEmpty = clientNotFound)(
-          f       = (user, client) ⇒ userMetadata(user, client)
+          f = (user, client) ⇒ userMetadata(user, client)
         )
-      yield response
 
-    validateRequest()
+      for
+        userOpt       ← userRepository.getUser(userId = token.clientId)
+        clientOpt     ← oauthRepository.getClient(clientId = token.clientId)
+        userClientOpt = (userOpt, clientOpt) mapN ((user, client) ⇒ (user, client))
+      yield response(userClientOpt)
+
+    validateRequest() flatTransact appModule.transcactor

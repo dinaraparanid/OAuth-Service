@@ -5,8 +5,11 @@ import cats.effect.IO
 
 import com.paranid5.auth_service.routing.*
 import com.paranid5.auth_service.routing.app.response.*
+import com.paranid5.auth_service.utills.extensions.ApplicativeEitherOps.foldTraverseR
+import com.paranid5.auth_service.utills.extensions.ApplicativeOptionOps.foldTraverseR
+import com.paranid5.auth_service.utills.extensions.flatTransact
 
-import doobie.syntax.all.*
+import doobie.free.connection.ConnectionIO
 
 import org.http4s.Response
 import org.http4s.dsl.io.*
@@ -37,28 +40,25 @@ private def onUpdate(
   Reader: appModule ⇒
     val oauthRepository = appModule.oauthModule.oauthRepository
 
-    def validateRequest(): IO[Response[IO]] =
-      for
-        oldAppOpt ← oauthRepository
-          .getApp(appId, appSecret)
-          .transact(appModule.transcactor)
+    def validateRequest(): ConnectionIO[IO[Response[IO]]] =
+      def response: ConnectionIO[IO[Response[IO]]] =
+        val either = if appName.isEmpty then Left(()) else Right(())
+        either.foldTraverseR(_ ⇒ appNameMustNotBeEmpty)(_ ⇒ updateApp())
 
-        response  ← oldAppOpt.fold(
+      for
+        oldAppOpt ← oauthRepository.getApp(appId, appSecret)
+        response  ← oldAppOpt.foldTraverseR(
           ifEmpty = appNotFound)(
-          f       = _ ⇒ if appName.isEmpty then appNameMustNotBeEmpty else updateApp()
+          f       = _ ⇒ response
         )
       yield response
 
-    def updateApp(): IO[Response[IO]] =
-      for
-        appId ← oauthRepository.updateApp(
-          appId           = appId,
-          newAppName      = appName,
-          newAppThumbnail = appThumbnail,
-          newCallbackUrl  = redirectUrl,
-        ).transact(appModule.transcactor)
+    def updateApp(): ConnectionIO[IO[Response[IO]]] =
+      for appId ← oauthRepository.updateApp(
+        appId           = appId,
+        newAppName      = appName,
+        newAppThumbnail = appThumbnail,
+        newCallbackUrl  = redirectUrl,
+      ) yield appSuccessfullyUpdated
 
-        response ← appSuccessfullyUpdated
-      yield response
-
-    validateRequest()
+    validateRequest() flatTransact appModule.transcactor

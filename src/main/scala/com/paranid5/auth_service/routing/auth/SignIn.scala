@@ -2,12 +2,13 @@ package com.paranid5.auth_service.routing.auth
 
 import cats.data.Reader
 import cats.effect.IO
-import cats.syntax.all.*
 
 import com.paranid5.auth_service.data.user.entity.User
 import com.paranid5.auth_service.routing.*
 import com.paranid5.auth_service.routing.auth.entity.{SignInRequest, matches}
 import com.paranid5.auth_service.routing.auth.response.userSignedIn
+import com.paranid5.auth_service.utills.extensions.ApplicativeOptionOps.foldTraverseR
+import com.paranid5.auth_service.utills.extensions.ApplicativeEitherOps.foldTraverseR
 
 import doobie.free.connection.ConnectionIO
 
@@ -61,11 +62,10 @@ private def onSignIn(query: Request[IO]): AppHttpResponse =
       request:   SignInRequest,
       foundUser: Option[User]
     ): ConnectionIO[IO[Response[IO]]] =
-      foundUser
-        .toRight(())
-        .map(validateUser(request, _))
-        .sequence
-        .map(_ getOrElse wrongEmail)
+      foundUser.foldTraverseR(
+        ifEmpty = wrongEmail)(
+        f       = validateUser(request, _)
+      )
 
     def validateUser(
       request:   SignInRequest,
@@ -75,7 +75,7 @@ private def onSignIn(query: Request[IO]): AppHttpResponse =
         if request matches foundUser then Right(retrieveCredentials(foundUser))
         else Left(())
 
-      impl.sequence map (_ getOrElse wrongPassword)
+      impl.foldTraverseR(_ ⇒ wrongPassword)(identity)
 
     def retrieveCredentials(foundUser: User): ConnectionIO[IO[Response[IO]]] =
       for clientOpt ← oauthRepository.getClient(foundUser.userId)

@@ -3,21 +3,18 @@ package com.paranid5.auth_service.routing.oauth
 import cats.data.Reader
 import cats.effect.IO
 
-import com.paranid5.auth_service.data.oauth.client.entity.{AppEntity, ClientEntity}
+import com.paranid5.auth_service.data.oauth.client.entity.ClientEntity
 import com.paranid5.auth_service.data.oauth.token.entity.TokenEntity
-import com.paranid5.auth_service.data.user.entity.User
 import com.paranid5.auth_service.routing.*
-import com.paranid5.auth_service.routing.auth.entity.{SignInRequest, matches}
-import com.paranid5.auth_service.routing.oauth.entity.TokenResponse
 import com.paranid5.auth_service.routing.oauth.response.tokensGenerated
+import com.paranid5.auth_service.utills.extensions.ApplicativeEitherOps.foldTraverseR
+import com.paranid5.auth_service.utills.extensions.ApplicativeOptionOps.foldTraverseR
+import com.paranid5.auth_service.utills.extensions.flatTransact
 
-import doobie.syntax.all.*
+import doobie.free.connection.ConnectionIO
 
-import io.circe.syntax.*
-
-import org.http4s.circe.CirceEntityCodec.{circeEntityDecoder, circeEntityEncoder}
+import org.http4s.Response
 import org.http4s.dsl.io.*
-import org.http4s.{DecodeResult, Request, Response}
 
 /**
  * Updates both refresh and access tokens for the platform only
@@ -38,7 +35,7 @@ import org.http4s.{DecodeResult, Request, Response}
  *       "token_id":     1,
  *       "client_id":    123,
  *       "app_id":       null,     // always null
- *       "value":        "abcdef", // 45-th length string
+ *       "value":        "abcdef",
  *       "life_seconds": 100,
  *       "created_at":   100,      // time since January 1, 1970 UTC
  *       "status":       "access"
@@ -47,7 +44,7 @@ import org.http4s.{DecodeResult, Request, Response}
  *       "token_id":     2,
  *       "client_id":    123,
  *       "app_id":       null,     // always null
- *       "value":        "abcdef", // 45-th length string
+ *       "value":        "abcdef",
  *       "life_seconds": 100,
  *       "created_at":   100,      // time since January 1, 1970 UTC
  *       "status":       "refresh"
@@ -66,52 +63,38 @@ private def onPlatformToken(
     val userRepository  = appModule.userModule.userRepository
     val oauthRepository = appModule.oauthModule.oauthRepository
 
-    def retrieveCredentials: IO[Response[IO]] =
+    def retrieveCredentials(): ConnectionIO[IO[Response[IO]]] =
       for
-        clientOpt ← oauthRepository
-          .findClient(clientId, clientSecret)
-          .transact(appModule.transcactor)
-
-        response  ← clientOpt.fold(
+        clientOpt ← oauthRepository.findClient(clientId, clientSecret)
+        response  ← clientOpt.foldTraverseR(
           ifEmpty = clientNotFound)(
           f       = removeOldTokens
         )
       yield response
 
-    def removeOldTokens(client: ClientEntity): IO[Response[IO]] =
-      println(client)
+    def removeOldTokens(client: ClientEntity): ConnectionIO[IO[Response[IO]]] =
       for
-        _ ← oauthRepository
-          .deleteRefreshToken(client.clientId)
-          .transact(appModule.transcactor)
-
-        _ ← oauthRepository
-          .deletePlatformAccessTokenWithScopes(client.clientId)
-          .transact(appModule.transcactor)
-
+        _        ← oauthRepository.deleteRefreshToken(client.clientId)
+        _        ← oauthRepository.deletePlatformAccessTokenWithScopes(client.clientId)
         response ← generateRefreshToken(client)
       yield response
 
-    def generateRefreshToken(client: ClientEntity): IO[Response[IO]] =
+    def generateRefreshToken(client: ClientEntity): ConnectionIO[IO[Response[IO]]] =
       for
         refreshTokenRes ← oauthRepository.newRefreshToken(
           clientId     = client.clientId,
           clientSecret = client.clientSecret
-        ).transact(appModule.transcactor)
+        )
 
-        response ← refreshTokenRes.fold(
-          fa = _ ⇒ somethingWentWrong,
+        response ← refreshTokenRes.foldTraverseR(
+          fa = _ ⇒ somethingWentWrong)(
           fb = generateAccessToken
         )
       yield response
 
-    def generateAccessToken(refreshToken: TokenEntity): IO[Response[IO]] =
-      for
-        accessTokenRes ← oauthRepository
-          .newPlatformAccessToken(refreshToken)
-          .transact(appModule.transcactor)
-
-        response ← accessTokenRes.fold(
+    def generateAccessToken(refreshToken: TokenEntity): ConnectionIO[IO[Response[IO]]] =
+      for accessTokenRes ← oauthRepository.newPlatformAccessToken(refreshToken)
+        yield accessTokenRes.fold(
           fa = _ ⇒ somethingWentWrong,
           fb = accessToken ⇒
             tokensGenerated(
@@ -119,7 +102,6 @@ private def onPlatformToken(
               refreshToken = refreshToken,
               redirectUrl  = redirectUrl getOrElse DefaultRedirect
             )
-        )
-      yield response
+      )
 
-    retrieveCredentials
+    retrieveCredentials() flatTransact appModule.transcactor

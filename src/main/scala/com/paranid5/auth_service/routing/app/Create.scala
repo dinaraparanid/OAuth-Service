@@ -7,12 +7,13 @@ import com.paranid5.auth_service.domain.generateSecret
 import com.paranid5.auth_service.routing.*
 import com.paranid5.auth_service.routing.app.entity.CreateRequest
 import com.paranid5.auth_service.routing.app.response.*
+import com.paranid5.auth_service.utills.extensions.ApplicativeEitherOps.foldTraverseR
 
-import doobie.syntax.all.*
+import doobie.free.connection.ConnectionIO
 
 import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
 import org.http4s.dsl.io.*
-import org.http4s.{DecodeResult, Request, Response}
+import org.http4s.{Request, Response}
 
 /**
  * Creates new application.
@@ -42,7 +43,7 @@ import org.http4s.{DecodeResult, Request, Response}
  * {{{
  *   {
  *     "app_id":     123,
- *     "app_secret": "abcd" // 10-th length string
+ *     "app_secret": "abcd"
  *   }
  * }}}
  */
@@ -51,36 +52,29 @@ private def onCreate(query: Request[IO]): AppHttpResponse =
   Reader: appModule ⇒
     val oauthRepository = appModule.oauthModule.oauthRepository
 
-    def processRequest(requestRes: DecodeResult[IO, CreateRequest]): IO[Response[IO]] =
-      for
-        responseIO ← requestRes.fold(_ ⇒ invalidBody, validateRequest)
-        response   ← responseIO
-      yield response
+    def validateRequest(request: CreateRequest): ConnectionIO[IO[Response[IO]]] =
+      val either = if request.appName.isEmpty then Left(()) else Right(request)
+      either.foldTraverseR(_ ⇒ appNameMustNotBeEmpty)(generateCredentials)
 
-    def validateRequest(request: CreateRequest): IO[Response[IO]] =
-      if request.appName.isEmpty then appNameMustNotBeEmpty
-      else generateCredentials(request)
-
-    def generateCredentials(request: CreateRequest): IO[Response[IO]] =
+    def generateCredentials(request: CreateRequest): ConnectionIO[IO[Response[IO]]] =
       for
-        appSecretRes ← generateSecret[IO]
-        response     ← appSecretRes.fold(
-          fa = _ ⇒ credentialsGenerationError,
+        appSecretRes ← generateSecret[ConnectionIO]
+        response     ← appSecretRes.foldTraverseR(
+          fa = _ ⇒ credentialsGenerationError)(
           fb = createApp(request, _)
         )
       yield response
 
-    def createApp(request: CreateRequest, appSecret: String): IO[Response[IO]] =
-      for
-        appId ← oauthRepository.insertApp(
-          appSecret    = appSecret,
-          appName      = request.appName,
-          appThumbnail = request.appThumbnail,
-          callbackUrl  = request.callbackUrl,
-          clientId     = request.clientId
-        ).transact(appModule.transcactor)
+    def createApp(
+      request:   CreateRequest,
+      appSecret: String
+    ): ConnectionIO[IO[Response[IO]]] =
+      for appId ← oauthRepository.insertApp(
+        appSecret    = appSecret,
+        appName      = request.appName,
+        appThumbnail = request.appThumbnail,
+        callbackUrl  = request.callbackUrl,
+        clientId     = request.clientId
+      ) yield appSuccessfullyCreated(appId, appSecret)
 
-        response ← appSuccessfullyCreated(appId, appSecret)
-      yield response
-
-    processRequest(query.attemptAs[CreateRequest])
+    processRequest(query.attemptAs[CreateRequest])(validateRequest) run appModule

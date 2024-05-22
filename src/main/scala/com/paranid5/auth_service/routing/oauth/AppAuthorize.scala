@@ -2,15 +2,17 @@ package com.paranid5.auth_service.routing.oauth
 
 import cats.data.Reader
 import cats.effect.IO
-import cats.syntax.all.*
+
 import com.paranid5.auth_service.data.oauth.client.entity.AppEntity
 import com.paranid5.auth_service.data.oauth.token.entity.AccessToken
 import com.paranid5.auth_service.routing.*
 import com.paranid5.auth_service.routing.oauth.entity.AuthorizeRequest
+import com.paranid5.auth_service.utills.extensions.ApplicativeOptionOps.foldTraverseR
+
 import doobie.free.connection.ConnectionIO
-import doobie.syntax.all.*
+
 import org.http4s.circe.CirceEntityCodec.circeEntityDecoder
-import org.http4s.{DecodeResult, Request, Response}
+import org.http4s.{Request, Response}
 
 /**
  * Validates access token for authorization for client app.
@@ -59,11 +61,10 @@ private def onAppAuthorize(
       requestToken: String,
       appOpt:       Option[AppEntity]
     ): ConnectionIO[IO[Response[IO]]] =
-      appOpt
-        .toRight(())
-        .map(retrieveToken(requestToken, _))
-        .sequence
-        .map(_ getOrElse appNotFound)
+      appOpt.foldTraverseR(
+        ifEmpty = appNotFound)(
+        f       =retrieveToken(requestToken, _)
+      )
 
     def retrieveToken(
       requestToken: String,
@@ -80,11 +81,10 @@ private def onAppAuthorize(
       requestToken:      String,
       retrievedTokenOpt: Option[AccessToken]
     ): ConnectionIO[IO[Response[IO]]] =
-      retrievedTokenOpt
-        .toRight(())
-        .map(validateToken(callbackUrl, _))
-        .sequence
-        .map(_ getOrElse tokenNotFound)
+      retrievedTokenOpt.foldTraverseR(
+        ifEmpty = tokenNotFound)(
+        f       = validateToken(callbackUrl, _)
+      )
 
     def validateToken(
       callbackUrl: String,

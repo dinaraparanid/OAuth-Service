@@ -8,7 +8,8 @@ import com.paranid5.auth_service.domain.generateSecret
 import com.paranid5.auth_service.routing.*
 import com.paranid5.auth_service.routing.auth.entity.SignUpRequest
 import com.paranid5.auth_service.routing.auth.response.userSuccessfullyRegistered
-import com.paranid5.auth_service.utills.extensions.*
+import com.paranid5.auth_service.utills.extensions.ApplicativeOptionOps.foldTraverseL
+import com.paranid5.auth_service.utills.extensions.ApplicativeEitherOps.foldTraverseR
 
 import doobie.free.connection.ConnectionIO
 
@@ -66,7 +67,7 @@ private def onSignUp(query: Request[IO]): AppHttpResponse =
       foundUser:       Option[User],
       encodedUserData: SignUpRequest,
     ): ConnectionIO[IO[Response[IO]]] =
-      foundUser.unwrapSequencedL(
+      foundUser.foldTraverseL(
         ifEmpty = addNewUser(encodedUserData))(
         f       = _ ⇒ userAlreadyRegistered
       )
@@ -87,7 +88,7 @@ private def onSignUp(query: Request[IO]): AppHttpResponse =
       clientId:        Long,
       clientSecretRes: Either[Throwable, String]
     ): ConnectionIO[IO[Response[IO]]] =
-      clientSecretRes.foldSequencedR(
+      clientSecretRes.foldTraverseR(
         fa = _ ⇒ credentialsGenerationError)(
         fb = clientSecret ⇒
           oauthRepository

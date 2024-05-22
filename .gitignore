@@ -15,5 +15,6 @@ builds
 target
 project/target
 .env
+.DS_Store
 
 # End of https://www.toptal.com/developers/gitignore/api/scala
