@@ -49,4 +49,4 @@ private def onDelete(
         appSecret = appSecret,
       ) yield appSuccessfullyDeleted
 
-    validateRequest() flatTransact appModule.transcactor
+    validateRequest() flatTransact appModule.transactor

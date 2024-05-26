@@ -10,15 +10,16 @@ import io.github.cdimascio.dotenv.Dotenv
 
 type IOTransactor = transactor.Transactor.Aux[IO, Unit]
 
+object IOTransactor:
+  def apply(dotenv: Dotenv): IOTransactor =
+    Transactor.fromDriverManager[IO](
+      driver     = "org.postgresql.Driver",
+      url        = dotenv `get` PostgresDbUrl,
+      user       = dotenv `get` PostgresDbUser,
+      password   = dotenv `get` PostgresDbPassword,
+      logHandler = Option(printSqlLogHandler)
+    )
+
 private def printSqlLogHandler: LogHandler[IO] =
   (logEvent: LogEvent) ⇒
     IO pure println(f"${logEvent.sql} // ${logEvent.args}")
-
-def getTransactor(dotenv: Dotenv): IOTransactor =
-  Transactor.fromDriverManager[IO](
-    driver     = "org.postgresql.Driver",
-    url        = dotenv `get` PostgresDbUrl,
-    user       = dotenv `get` PostgresDbUser,
-    password   = dotenv `get` PostgresDbPassword,
-    logHandler = Option(printSqlLogHandler)
-  )

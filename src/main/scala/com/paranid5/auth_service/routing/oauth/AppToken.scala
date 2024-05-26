@@ -143,4 +143,4 @@ private def onAppToken(
         accessTokenAppId = appId,
       ) yield response(accessTokenRes, redirect)
 
-    retrieveCredentials() flatTransact appModule.transcactor
+    retrieveCredentials() flatTransact appModule.transactor

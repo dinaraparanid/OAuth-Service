@@ -3,13 +3,14 @@ package com.paranid5.auth_service.routing.auth
 import cats.data.Reader
 import cats.effect.IO
 
+import com.paranid5.auth_service.data.mail.sendConfirmEmailViaMailer
 import com.paranid5.auth_service.data.user.entity.User
 import com.paranid5.auth_service.domain.generateSecret
 import com.paranid5.auth_service.routing.*
 import com.paranid5.auth_service.routing.auth.entity.SignUpRequest
-import com.paranid5.auth_service.routing.auth.response.userSuccessfullyRegistered
-import com.paranid5.auth_service.utills.extensions.ApplicativeOptionOps.foldTraverseL
+import com.paranid5.auth_service.routing.auth.response.*
 import com.paranid5.auth_service.utills.extensions.ApplicativeEitherOps.foldTraverseR
+import com.paranid5.auth_service.utills.extensions.ApplicativeOptionOps.foldTraverseL
 
 import doobie.free.connection.ConnectionIO
 
@@ -19,6 +20,7 @@ import org.http4s.{Request, Response}
 
 /**
  * Sign up on platform (e.g. to manage user apps).
+ * Proceeds with email confirmation.
  * Adds new user and client to the database,
  * if it was not already registered.
  *
@@ -30,7 +32,8 @@ import org.http4s.{Request, Response}
  *   {
  *     "username": "some username",
  *     "email":    "test@gmail.com",
- *     "password": "qwerty"
+ *     "password": "qwerty",
+ *     "confirm_url": "https://platform_frontent/confirm_email
  *   }
  * }}}
  *
@@ -41,13 +44,7 @@ import org.http4s.{Request, Response}
  *
  * 3. [[InternalServerError]] in case of insertions errors
  *
- * 4. [[Created]] with credentials body:
- * {{{
- *   {
- *     "client_id":     123,
- *     "client_secret": "abcdefghij"
- *   }
- * }}}
+ * 4. [[Ok]] - "Confirmation email was successfully sent"
  */
 
 private def onSignUp(query: Request[IO]): AppHttpResponse =
@@ -81,19 +78,57 @@ private def onSignUp(query: Request[IO]): AppHttpResponse =
         )
 
         clientSecretRes ← generateSecret[ConnectionIO]
-        response        ← processGeneratedCredentials(clientId, clientSecretRes)
+        response        ← processGeneratedCredentials(
+          clientId        = clientId,
+          clientSecretRes = clientSecretRes,
+          encodedUserData = encodedUserData
+        )
       yield response
 
     def processGeneratedCredentials(
       clientId:        Long,
-      clientSecretRes: Either[Throwable, String]
+      clientSecretRes: Either[Throwable, String],
+      encodedUserData: SignUpRequest,
     ): ConnectionIO[IO[Response[IO]]] =
       clientSecretRes.foldTraverseR(
         fa = _ ⇒ credentialsGenerationError)(
         fb = clientSecret ⇒
           oauthRepository
             .insertClient(clientId, clientSecret)
-            .map(_ ⇒ userSuccessfullyRegistered(clientId, clientSecret))
+            .flatMap(_ ⇒ generateConfirmationCode(encodedUserData))
       )
+
+    def generateConfirmationCode(encodedUserData: SignUpRequest): ConnectionIO[IO[Response[IO]]] =
+      generateSecret[ConnectionIO] flatMap:
+        _.foldTraverseR(
+          _ ⇒ confirmationCodeGenerationError)(
+          updateConfirmationCode(encodedUserData, _)
+        )
+
+    def updateConfirmationCode(
+      encodedUserData: SignUpRequest,
+      confirmCode:     String
+    ): ConnectionIO[IO[Response[IO]]] =
+      for _ ← userRepository.updateConfirmationCode(
+        email = encodedUserData.email,
+        confirmationCode = confirmCode,
+      ) yield sendConfirmEmail(encodedUserData, confirmCode)
+
+    def sendConfirmEmail(
+      encodedUserData: SignUpRequest,
+      confirmCode:     String
+    ): IO[Response[IO]] =
+      sendConfirmEmailViaMailer(
+        username = encodedUserData.username,
+        email = encodedUserData.email,
+        confirmationUrl = encodedUserData.confirmUrl,
+        confirmationCode = confirmCode,
+      )
+        .run(appModule)
+        .flatMap:
+          _.fold(
+            _ ⇒ confirmationEmailNotSent,
+            _ ⇒ confirmationEmailSuccessfullySent
+          )
 
     processRequest(query.attemptAs[SignUpRequest])(retrieveUserData) run appModule

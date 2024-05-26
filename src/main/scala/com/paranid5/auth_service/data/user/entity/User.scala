@@ -4,5 +4,5 @@ final case class User(
   userId:          Long,
   username:        String,
   email:           String,
-  encodedPassword: String
+  encodedPassword: String,
 )

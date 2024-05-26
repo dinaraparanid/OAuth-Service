@@ -27,7 +27,7 @@ private def tokenExpired: IO[Response[IO]] =
 private def invalidToken: InvalidTokenReason ⇒ IO[Response[IO]] =
   case InvalidTokenReason.Expired         ⇒ tokenExpired
   case InvalidTokenReason.NotFound        ⇒ tokenNotFound
-  case InvalidTokenReason.GenerationError ⇒ somethingWentWrong
+  case InvalidTokenReason.GenerationError ⇒ tokenGenerationError
 
 private def clientNotFound: IO[Response[IO]] =
   NotFound("Client was not found")
@@ -38,11 +38,15 @@ private def appNotFound: IO[Response[IO]] =
 private def userAlreadyRegistered: IO[Response[IO]] =
   BadRequest("User with such email is already registered")
 
+// TODO: Specify reason
 private def somethingWentWrong: IO[Response[IO]] =
   InternalServerError("Something went wrong")
 
 private def credentialsGenerationError: IO[Response[IO]] =
   InternalServerError("User credentials generation error. Try again")
+
+private def tokenGenerationError: IO[Response[IO]] =
+  InternalServerError("Token generation url")
 
 private def redirectToCallbackUrl(callbackUrl: String): IO[Response[IO]] =
   Ok(callbackUrl)

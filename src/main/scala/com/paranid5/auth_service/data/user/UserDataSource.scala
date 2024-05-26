@@ -2,6 +2,7 @@ package com.paranid5.auth_service.data.user
 
 import cats.Applicative
 import cats.syntax.all.*
+
 import com.paranid5.auth_service.data.user.entity.User
 
 trait UserDataSource[F[_] : Applicative, S]:

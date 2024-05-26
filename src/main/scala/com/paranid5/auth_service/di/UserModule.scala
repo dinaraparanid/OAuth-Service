@@ -7,5 +7,8 @@ final class UserModule(transactor: IOTransactor):
   private lazy val userDataSource: PostgresUserDataSource =
     PostgresUserDataSource()
 
+  private lazy val emailConfirmCodeDataSource: PostgresEmailConfirmCodeDataSource =
+    PostgresEmailConfirmCodeDataSource()
+
   lazy val userRepository: PostgresUserRepository =
-    PostgresUserRepository(userDataSource)
+    PostgresUserRepository(userDataSource, emailConfirmCodeDataSource)

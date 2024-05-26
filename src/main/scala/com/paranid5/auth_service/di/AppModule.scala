@@ -4,16 +4,18 @@ import cats.data.Reader
 import cats.effect.IO
 import cats.syntax.all.*
 
-import com.paranid5.auth_service.data.{IOTransactor, getTransactor}
+import com.paranid5.auth_service.data.IOTransactor
+import com.paranid5.auth_service.data.mail.PlatformMailer
 
 import io.github.cdimascio.dotenv.Dotenv
 
 type AppDependencies[F] = Reader[AppModule, F]
 
 final class AppModule(val dotenv: Dotenv):
-  lazy val transcactor: IOTransactor = getTransactor(dotenv)
-  lazy val userModule:  UserModule   = UserModule(transcactor)
-  lazy val oauthModule: OAuthModule  = OAuthModule(transcactor)
+  lazy val transactor:  IOTransactor   = IOTransactor(dotenv)
+  lazy val mailer:      PlatformMailer = PlatformMailer(dotenv)
+  lazy val userModule:  UserModule     = UserModule(transactor)
+  lazy val oauthModule: OAuthModule    = OAuthModule(transactor)
 
 object AppModule:
   def apply[T](launch: AppModule ⇒ IO[T]): IO[Either[Throwable, T]] =

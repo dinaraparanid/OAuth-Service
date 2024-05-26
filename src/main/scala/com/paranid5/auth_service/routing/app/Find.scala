@@ -52,4 +52,4 @@ private def onFind(
         f       = appSuccessfullyFound
       )
 
-    impl flatTransact appModule.transcactor
+    impl flatTransact appModule.transactor

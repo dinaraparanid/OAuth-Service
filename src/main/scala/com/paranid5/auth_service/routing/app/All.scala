@@ -44,4 +44,4 @@ private def onAll(clientId: Long): AppHttpResponse =
       for apps ← oauthRepository.getClientApps(clientId)
         yield clientApps(apps)
 
-    response flatTransact appModule.transcactor
+    response flatTransact appModule.transactor

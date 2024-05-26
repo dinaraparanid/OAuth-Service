@@ -1,8 +1,7 @@
 package com.paranid5.auth_service.data.user
 
 import cats.Applicative
-import com.paranid5.auth_service.data.user.entity.User
-import io.github.cdimascio.dotenv.Dotenv
+import com.paranid5.auth_service.data.user.entity.{EmailConfirmCode, User}
 
 trait UserRepository[F[_] : Applicative, R]:
   extension (repository: R)
@@ -28,3 +27,14 @@ trait UserRepository[F[_] : Applicative, R]:
     ): F[Unit]
 
     def deleteUser(userId: Long): F[Unit]
+
+    def getConfirmationCode(email: String): F[Option[EmailConfirmCode]]
+
+    def findConfirmationCode(code: String): F[Option[EmailConfirmCode]]
+
+    def updateConfirmationCode(
+      email:           String,
+      confirmationCode: String,
+    ): F[Unit]
+
+    def removeConfirmationCode(code: String): F[Unit]

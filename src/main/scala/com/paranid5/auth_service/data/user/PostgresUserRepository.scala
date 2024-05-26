@@ -1,12 +1,13 @@
 package com.paranid5.auth_service.data.user
 
 import com.paranid5.auth_service.data.*
-import com.paranid5.auth_service.data.user.entity.User
+import com.paranid5.auth_service.data.user.entity.{EmailConfirmCode, User}
 
 import doobie.free.connection.ConnectionIO
 
 final class PostgresUserRepository(
-  private val userDataSource: PostgresUserDataSource
+  private val userDataSource:            PostgresUserDataSource,
+  private val emailConfirmCodeDataSource: PostgresEmailConfirmCodeDataSource,
 )
 
 object PostgresUserRepository:
@@ -55,3 +56,26 @@ object PostgresUserRepository:
         repository
           .userDataSource
           .deleteUser(userId)
+
+      override def getConfirmationCode(email: String): ConnectionIO[Option[EmailConfirmCode]] =
+        repository
+          .emailConfirmCodeDataSource
+          .getConfirmationCode(email)
+
+      override def findConfirmationCode(code: String): ConnectionIO[Option[EmailConfirmCode]] =
+        repository
+          .emailConfirmCodeDataSource
+          .findConfirmationCode(code)
+
+      override def updateConfirmationCode(
+        email:           String,
+        confirmationCode: String,
+      ): ConnectionIO[Unit] =
+        repository
+          .emailConfirmCodeDataSource
+          .updateConfirmationCode(email, confirmationCode)
+
+      override def removeConfirmationCode(code: String): ConnectionIO[Unit] =
+        repository
+          .emailConfirmCodeDataSource
+          .removeConfirmationCode(code)

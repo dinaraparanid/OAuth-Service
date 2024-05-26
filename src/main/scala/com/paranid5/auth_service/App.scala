@@ -44,7 +44,7 @@ object App extends IOApp:
           .as(ExitCode.Success)
 
       for
-        _   ← createTables().transact(appModule.transcactor)
+        _   ← createTables().transact(appModule.transactor)
         res ← impl
       yield res
 

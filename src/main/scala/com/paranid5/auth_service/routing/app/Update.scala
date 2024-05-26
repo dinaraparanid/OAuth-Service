@@ -61,4 +61,4 @@ private def onUpdate(
         newCallbackUrl  = redirectUrl,
       ) yield appSuccessfullyUpdated
 
-    validateRequest() flatTransact appModule.transcactor
+    validateRequest() flatTransact appModule.transactor

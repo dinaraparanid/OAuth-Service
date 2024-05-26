@@ -65,4 +65,4 @@ private def onFindUser(accessToken: String): AppHttpResponse =
         userClientOpt = (userOpt, clientOpt) mapN ((user, client) ⇒ (user, client))
       yield response(userClientOpt)
 
-    validateRequest() flatTransact appModule.transcactor
+    validateRequest() flatTransact appModule.transactor

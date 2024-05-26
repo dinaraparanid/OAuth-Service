@@ -22,13 +22,13 @@ object PostgresUserDataSource:
         """.effect
 
       override def users: ConnectionIO[List[User]] =
-        sql"""SELECT * FROM "User"""".list[User]
+        sql"""SELECT * FROM "User"""".list
 
       override def getUser(userId: Long): ConnectionIO[Option[User]] =
-        sql"""SELECT * FROM "User" WHERE user_id = $userId""".option[User]
+        sql"""SELECT * FROM "User" WHERE user_id = $userId""".option
 
       override def getUserByEmail(email: String): ConnectionIO[Option[User]] =
-        sql"""SELECT * FROM "User" WHERE email = $email""".option[User]
+        sql"""SELECT * FROM "User" WHERE email = $email""".option
 
       override def storeUser(
         username:        String,

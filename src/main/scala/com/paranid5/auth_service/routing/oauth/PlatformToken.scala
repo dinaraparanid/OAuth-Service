@@ -104,4 +104,4 @@ private def onPlatformToken(
             )
       )
 
-    retrieveCredentials() flatTransact appModule.transcactor
+    retrieveCredentials() flatTransact appModule.transactor
